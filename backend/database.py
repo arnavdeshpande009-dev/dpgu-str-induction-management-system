@@ -37,9 +37,41 @@ def init_db():
             smtp_user TEXT DEFAULT '',
             smtp_password TEXT DEFAULT '',
             smtp_from TEXT DEFAULT 'induction@dpgu.edu.in',
-            smtp_from_name TEXT DEFAULT 'DPGU STR Induction Team'
+            smtp_from_name TEXT DEFAULT 'DPGU STR Induction Team',
+            email_subject TEXT DEFAULT 'Your DPGU STR Induction Pass & Invitation',
+            email_body TEXT DEFAULT 'Congratulations on your admission to DPGU STR! We are thrilled to welcome you to our community.\n\nAttached to this email, you will find your unique Induction Check-In QR Pass (PNG image). Please download and save this pass on your mobile device. You will need to present this QR code at the registration desk for check-in on the day of the event.',
+            event_date TEXT DEFAULT 'August 5, 2026',
+            event_time TEXT DEFAULT '09:00 AM',
+            event_venue TEXT DEFAULT 'Main Auditorium',
+            event_dress_code TEXT DEFAULT 'Smart Casuals'
         )
     """)
+    
+    # Try altering table to add columns for existing databases (backwards compatibility)
+    try:
+        cursor.execute("ALTER TABLE settings ADD COLUMN email_subject TEXT DEFAULT 'Your DPGU STR Induction Pass & Invitation'")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE settings ADD COLUMN email_body TEXT DEFAULT 'Congratulations on your admission to DPGU STR! We are thrilled to welcome you to our community.\n\nAttached to this email, you will find your unique Induction Check-In QR Pass (PNG image). Please download and save this pass on your mobile device. You will need to present this QR code at the registration desk for check-in on the day of the event.'")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE settings ADD COLUMN event_date TEXT DEFAULT 'August 5, 2026'")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE settings ADD COLUMN event_time TEXT DEFAULT '09:00 AM'")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE settings ADD COLUMN event_venue TEXT DEFAULT 'Main Auditorium'")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE settings ADD COLUMN event_dress_code TEXT DEFAULT 'Smart Casuals'")
+    except Exception:
+        pass
     
     # Users Table
     cursor.execute("""
@@ -84,7 +116,13 @@ def update_settings(settings_dict):
             smtp_user = ?,
             smtp_password = ?,
             smtp_from = ?,
-            smtp_from_name = ?
+            smtp_from_name = ?,
+            email_subject = ?,
+            email_body = ?,
+            event_date = ?,
+            event_time = ?,
+            event_venue = ?,
+            event_dress_code = ?
         WHERE id = 1
     """, (
         1 if settings_dict.get("mock_email", True) else 0,
@@ -93,7 +131,13 @@ def update_settings(settings_dict):
         settings_dict.get("smtp_user", ""),
         settings_dict.get("smtp_password", ""),
         settings_dict.get("smtp_from", "induction@dpgu.edu.in"),
-        settings_dict.get("smtp_from_name", "DPGU STR Induction Team")
+        settings_dict.get("smtp_from_name", "DPGU STR Induction Team"),
+        settings_dict.get("email_subject", "Your DPGU STR Induction Pass & Invitation"),
+        settings_dict.get("email_body", ""),
+        settings_dict.get("event_date", "August 5, 2026"),
+        settings_dict.get("event_time", "09:00 AM"),
+        settings_dict.get("event_venue", "Main Auditorium"),
+        settings_dict.get("event_dress_code", "Smart Casuals")
     ))
     conn.commit()
     conn.close()

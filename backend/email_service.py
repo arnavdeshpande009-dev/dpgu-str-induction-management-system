@@ -123,6 +123,19 @@ def send_email(
     sender = config.SMTP_FROM
     sender_name = config.SMTP_FROM_NAME
     
+    # Sensible defaults for customization
+    email_subject = "Your DPGU STR Induction Pass & Invitation"
+    email_body = (
+        "Congratulations on your admission to DPGU STR! We are thrilled to welcome you to our community.\n\n"
+        "Attached to this email, you will find your unique Induction Check-In QR Pass (PNG image). "
+        "Please download and save this pass on your mobile device. You will need to present this QR code "
+        "at the registration desk for check-in on the day of the event."
+    )
+    event_date = "August 5, 2026"
+    event_time = "09:00 AM"
+    event_venue = "Main Auditorium"
+    event_dress_code = "Smart Casuals"
+
     if smtp_settings:
         mock_mode = smtp_settings.get("mock_email", mock_mode)
         host = smtp_settings.get("smtp_host", host)
@@ -132,6 +145,13 @@ def send_email(
         sender = smtp_settings.get("smtp_from", sender)
         sender_name = smtp_settings.get("smtp_from_name", sender_name)
         
+        email_subject = smtp_settings.get("email_subject") or email_subject
+        email_body = smtp_settings.get("email_body") or email_body
+        event_date = smtp_settings.get("event_date") or event_date
+        event_time = smtp_settings.get("event_time") or event_time
+        event_venue = smtp_settings.get("event_venue") or event_venue
+        event_dress_code = smtp_settings.get("event_dress_code") or event_dress_code
+        
     if not mock_mode and (not user or not pwd):
         mock_mode = True
         
@@ -139,7 +159,8 @@ def send_email(
         # Mock mode: we already saved the preview PNG to MOCK_EMAILS_DIR, so we are done
         return True
         
-    # Email HTML body (text only, card attached as file)
+    # Email HTML body
+    formatted_body = email_body.replace("\n", "<br>")
     html_content = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -149,17 +170,14 @@ def send_email(
     <div style="max-width: 600px; background-color: #ffffff; margin: 20px auto; border-radius: 12px; padding: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #e5e7eb;">
         <h2 style="color: #1e1b4b; margin-top: 0;">Welcome, {student_name}!</h2>
         <p style="line-height: 1.6; color: #4b5563; font-size: 15px;">
-            Congratulations on your admission to DPGU STR! We are thrilled to welcome you to our community.
-        </p>
-        <p style="line-height: 1.6; color: #4b5563; font-size: 15px;">
-            Attached to this email, you will find your unique <strong>Induction Check-In QR Pass</strong> (PNG image). Please download and save this pass on your mobile device. You will need to present this QR code at the registration desk for check-in on the day of the event.
+            {formatted_body}
         </p>
         <div style="margin: 30px 0; padding: 15px; background-color: #f9fafb; border-left: 4px solid #4f46e5; border-radius: 4px; font-size: 14px; color: #374151; line-height: 1.5;">
             <strong>Event Details:</strong><br>
-            📅 Date: August 5, 2026<br>
-            ⏰ Reporting Time: 09:00 AM<br>
-            📍 Venue: Main Auditorium<br>
-            👔 Dress Code: Smart Casuals
+            📅 Date: {event_date}<br>
+            ⏰ Reporting Time: {event_time}<br>
+            📍 Venue: {event_venue}<br>
+            👔 Dress Code: {event_dress_code}
         </div>
         <p style="font-size: 13px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 15px; margin-top: 25px;">
             This is an automated email. Please do not reply directly to this message.
@@ -172,7 +190,7 @@ def send_email(
     try:
         # Create standard multipart message
         msg = MIMEMultipart()
-        msg["Subject"] = f"Your Induction Check-In QR Pass - {student_name}"
+        msg["Subject"] = f"{email_subject} - {student_name}"
         msg["From"] = f"{sender_name} <{sender}>"
         msg["To"] = student_email
         
@@ -190,6 +208,28 @@ def send_email(
                 f"attachment; filename={safe_filename}"
             )
             msg.attach(part_attachment)
+            
+        # Attach any other files from uploads/attachments folder
+        attachments_dir = os.path.join("uploads", "attachments")
+        if not os.path.exists(attachments_dir):
+            attachments_dir = os.path.join("backend", "uploads", "attachments")
+            
+        if os.path.exists(attachments_dir):
+            for filename in os.listdir(attachments_dir):
+                file_path = os.path.join(attachments_dir, filename)
+                if os.path.isfile(file_path):
+                    try:
+                        with open(file_path, "rb") as af:
+                            part = MIMEBase("application", "octet-stream")
+                            part.set_payload(af.read())
+                            encoders.encode_base64(part)
+                            part.add_header(
+                                "Content-Disposition",
+                                f"attachment; filename={filename}"
+                            )
+                            msg.attach(part)
+                    except Exception as e:
+                        print(f"Failed to attach file {filename}: {e}")
             
         # Connect and send
         server = smtplib.SMTP(host, port)

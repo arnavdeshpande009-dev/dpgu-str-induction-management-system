@@ -248,7 +248,13 @@ def get_settings():
         smtp_user=settings["smtp_user"] or "",
         smtp_password=settings["smtp_password"] or "",
         smtp_from=settings["smtp_from"] or "",
-        smtp_from_name=settings["smtp_from_name"] or ""
+        smtp_from_name=settings["smtp_from_name"] or "",
+        email_subject=settings.get("email_subject") or "Your DPGU STR Induction Pass & Invitation",
+        email_body=settings.get("email_body") or "",
+        event_date=settings.get("event_date") or "August 5, 2026",
+        event_time=settings.get("event_time") or "09:00 AM",
+        event_venue=settings.get("event_venue") or "Main Auditorium",
+        event_dress_code=settings.get("event_dress_code") or "Smart Casuals"
     )
 
 @app.post("/api/settings")
@@ -644,3 +650,47 @@ def toggle_user_auth(username: str):
     conn.commit()
     conn.close()
     return {"success": True, "username": username, "is_authorized": bool(new_status)}
+
+# Attachments Management API
+ATTACHMENTS_DIR = os.path.join("uploads", "attachments")
+os.makedirs(ATTACHMENTS_DIR, exist_ok=True)
+
+@app.get("/api/attachments")
+def list_attachments():
+    """List all custom files uploaded to the attachments folder."""
+    files = []
+    if os.path.exists(ATTACHMENTS_DIR):
+        for f in os.listdir(ATTACHMENTS_DIR):
+            file_path = os.path.join(ATTACHMENTS_DIR, f)
+            if os.path.isfile(file_path) and f != ".gitkeep":
+                files.append({
+                    "filename": f,
+                    "size": os.path.getsize(file_path)
+                })
+    return files
+
+@app.post("/api/attachments/upload")
+def upload_attachment(file: UploadFile = File(...)):
+    """Upload a custom attachment file to be sent in the student emails."""
+    try:
+        # Secure the filename
+        safe_filename = file.filename.replace(" ", "_")
+        dest_path = os.path.join(ATTACHMENTS_DIR, safe_filename)
+        with open(dest_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        return {"success": True, "filename": safe_filename, "message": "Attachment uploaded successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload attachment: {e}")
+
+@app.delete("/api/attachments/{filename}")
+def delete_attachment(filename: str):
+    """Delete a custom attachment file."""
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(ATTACHMENTS_DIR, safe_filename)
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            return {"success": True, "message": f"Attachment {safe_filename} deleted."}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to delete attachment: {e}")
+    raise HTTPException(status_code=404, detail="Attachment file not found.")

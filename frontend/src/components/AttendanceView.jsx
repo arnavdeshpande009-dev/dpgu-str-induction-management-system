@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function AttendanceView({ showToast, apiBase }) {
+export default function AttendanceView({ showToast, apiBase, currentUser }) {
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState("");
   const [checkedInFilter, setCheckedInFilter] = useState("all");
@@ -180,13 +180,15 @@ export default function AttendanceView({ showToast, apiBase }) {
                       >
                         🔎 QR
                       </button>
-                      <button 
-                        className={`btn ${student.checked_in ? 'btn-danger' : 'btn-primary'}`}
-                        style={{ padding: '6px 12px', fontSize: '12px', minWidth: '85px' }}
-                        onClick={() => handleManualCheckIn(student.student_id, student.checked_in)}
-                      >
-                        {student.checked_in ? "Checkout" : "Check-in"}
-                      </button>
+                      {(!student.checked_in || (currentUser && currentUser.role === 'admin')) && (
+                        <button 
+                          className={`btn ${student.checked_in ? 'btn-danger' : 'btn-primary'}`}
+                          style={{ padding: '6px 12px', fontSize: '12px', minWidth: '85px' }}
+                          onClick={() => handleManualCheckIn(student.student_id, student.checked_in)}
+                        >
+                          {student.checked_in ? "Checkout" : "Check-in"}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -8,9 +8,129 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
   const [mockEmails, setMockEmails] = useState([]);
   const [previewEmail, setPreviewEmail] = useState(null);
 
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [eventTime, setEventTime] = useState("");
+  const [eventVenue, setEventVenue] = useState("");
+  const [eventDressCode, setEventDressCode] = useState("");
+  
+  const [attachments, setAttachments] = useState([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
   useEffect(() => {
     fetchMockEmails();
+    loadEmailSettings();
+    loadAttachments();
   }, []);
+
+  const loadEmailSettings = async () => {
+    try {
+      const res = await fetch(`${apiBase}/api/settings`);
+      if (res.ok) {
+        const data = await res.json();
+        setEmailSubject(data.email_subject || "");
+        setEmailBody(data.email_body || "");
+        setEventDate(data.event_date || "");
+        setEventTime(data.event_time || "");
+        setEventVenue(data.event_venue || "");
+        setEventDressCode(data.event_dress_code || "");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const loadAttachments = async () => {
+    try {
+      const res = await fetch(`${apiBase}/api/attachments`);
+      if (res.ok) {
+        const data = await res.json();
+        setAttachments(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSaveTemplate = async () => {
+    setSavingTemplate(true);
+    try {
+      const settingsRes = await fetch(`${apiBase}/api/settings`);
+      let existingSettings = {};
+      if (settingsRes.ok) {
+        existingSettings = await settingsRes.json();
+      }
+      
+      const payload = {
+        ...existingSettings,
+        email_subject: emailSubject,
+        email_body: emailBody,
+        event_date: eventDate,
+        event_time: eventTime,
+        event_venue: eventVenue,
+        event_dress_code: eventDressCode
+      };
+
+      const res = await fetch(`${apiBase}/api/settings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        showToast("Success", "Email template saved successfully.", "success");
+      } else {
+        showToast("Error", "Failed to save email template.", "error");
+      }
+    } catch (err) {
+      showToast("Error", "Server connection failed.", "error");
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const handleAttachmentUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingAttachment(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      const res = await fetch(`${apiBase}/api/attachments/upload`, {
+        method: "POST",
+        body: formData
+      });
+      if (res.ok) {
+        showToast("Success", `${file.name} uploaded successfully.`, "success");
+        loadAttachments();
+      } else {
+        showToast("Error", "Failed to upload attachment.", "error");
+      }
+    } catch (err) {
+      showToast("Error", "Server upload failed.", "error");
+    } finally {
+      setUploadingAttachment(false);
+      e.target.value = null;
+    }
+  };
+
+  const handleDeleteAttachment = async (filename) => {
+    try {
+      const res = await fetch(`${apiBase}/api/attachments/${encodeURIComponent(filename)}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        showToast("Deleted", "Attachment removed.", "info");
+        loadAttachments();
+      } else {
+        showToast("Error", "Failed to delete attachment.", "error");
+      }
+    } catch (err) {
+      showToast("Error", "Server connection failed.", "error");
+    }
+  };
 
   // Poll server for stats and email previews during background email sending
   useEffect(() => {
@@ -171,7 +291,7 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px', margin: '@media (min-width: 1024px)' }} className="dashboard-sections-grid">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '30px', alignItems: 'start' }} className="dashboard-sections-grid">
         {/* Upload & Actions Panel */}
         <div className="panel">
           <div className="panel-header">
@@ -228,6 +348,156 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
               {sendingEmails ? "Sending Passes..." : "Generate QR Pass & Send Invitation Emails"}
             </button>
+          </div>
+        </div>
+
+        {/* Email Customization & Attachments Panel */}
+        <div className="panel">
+          <div className="panel-header">
+            <h2 className="panel-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              Email Customization & Attachments
+            </h2>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            <div className="form-group">
+              <label className="form-label">Email Subject Prefix</label>
+              <input 
+                type="text" 
+                className="settings-input" 
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                placeholder="e.g. Your Induction Check-In QR Pass"
+                style={{ width: '100%' }}
+              />
+            </div>
+            
+            <div className="form-group">
+              <label className="form-label">Email Message Body</label>
+              <textarea 
+                className="settings-input" 
+                value={emailBody}
+                onChange={(e) => setEmailBody(e.target.value)}
+                placeholder="Write the welcome text for students here..."
+                style={{ width: '100%', minHeight: '100px', resize: 'vertical', padding: '10px' }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              <div className="form-group">
+                <label className="form-label">Event Date</label>
+                <input 
+                  type="text" 
+                  className="settings-input" 
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                  placeholder="e.g. August 5, 2026"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Reporting Time</label>
+                <input 
+                  type="text" 
+                  className="settings-input" 
+                  value={eventTime}
+                  onChange={(e) => setEventTime(e.target.value)}
+                  placeholder="e.g. 09:00 AM"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              <div className="form-group">
+                <label className="form-label">Venue</label>
+                <input 
+                  type="text" 
+                  className="settings-input" 
+                  value={eventVenue}
+                  onChange={(e) => setEventVenue(e.target.value)}
+                  placeholder="e.g. Main Auditorium"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Dress Code</label>
+                <input 
+                  type="text" 
+                  className="settings-input" 
+                  value={eventDressCode}
+                  onChange={(e) => setEventDressCode(e.target.value)}
+                  placeholder="e.g. Smart Casuals"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+
+            <button 
+              className="btn btn-primary"
+              onClick={handleSaveTemplate}
+              disabled={savingTemplate}
+              style={{ alignSelf: 'flex-start', marginTop: '10px' }}
+            >
+              {savingTemplate ? "Saving..." : "Save Template"}
+            </button>
+
+            {/* Custom Attachments Section */}
+            <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-glass)', paddingTop: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <span className="form-label" style={{ margin: 0 }}>Additional Attachments ({attachments.length})</span>
+                <button 
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => document.getElementById("attachmentUploadInput").click()}
+                  disabled={uploadingAttachment}
+                >
+                  {uploadingAttachment ? "Uploading..." : "Add File"}
+                </button>
+                <input 
+                  id="attachmentUploadInput"
+                  type="file" 
+                  style={{ display: 'none' }}
+                  onChange={handleAttachmentUpload}
+                />
+              </div>
+
+              {attachments.length === 0 ? (
+                <div style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', padding: '15px', border: '1px dashed var(--border-glass)', borderRadius: '8px' }}>
+                  No extra attachments. Only the student pass PNG card will be attached.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {attachments.map((file, idx) => (
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        background: 'rgba(255,255,255,0.02)', 
+                        padding: '10px 15px', 
+                        borderRadius: '8px', 
+                        border: '1px solid var(--border-glass)' 
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '14px', color: '#fff', fontWeight: '500' }}>{file.filename}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{(file.size / 1024).toFixed(1)} KB</span>
+                      </div>
+                      <button 
+                        className="btn" 
+                        style={{ background: 'transparent', border: 'none', color: 'var(--color-error)', padding: '0 5px', cursor: 'pointer', fontSize: '20px', lineHeight: 1 }}
+                        onClick={() => handleDeleteAttachment(file.filename)}
+                        title="Remove Attachment"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
