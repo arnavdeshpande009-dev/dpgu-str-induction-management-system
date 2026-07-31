@@ -164,20 +164,9 @@ def send_email(
 <head>
     <meta charset="utf-8">
 </head>
-<body style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 20px; color: #1e1b4b; margin: 0;">
-    <div style="max-width: 600px; background-color: #ffffff; margin: 20px auto; border-radius: 12px; padding: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #e5e7eb;">
-        <p style="line-height: 1.6; color: #4b5563; font-size: 15px;">
-            {formatted_body}
-        </p>
-        <div style="margin: 30px 0; padding: 15px; background-color: #f9fafb; border-left: 4px solid #4f46e5; border-radius: 4px; font-size: 14px; color: #374151; line-height: 1.5;">
-            <strong>Event Details:</strong><br>
-            📅 Date: {event_date}<br>
-            ⏰ Reporting Time: {event_time}<br>
-            📍 Venue: {event_venue}
-        </div>
-        <p style="font-size: 13px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 15px; margin-top: 25px;">
-            This is an automated email. Please do not reply directly to this message.
-        </p>
+<body style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #222222; line-height: 1.5; background-color: #ffffff; margin: 0; padding: 20px;">
+    <div style="max-width: 800px; margin: 0 auto;">
+        {formatted_body}
     </div>
 </body>
 </html>
