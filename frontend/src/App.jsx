@@ -5,7 +5,7 @@ import ScannerView from './components/ScannerView';
 import SettingsView from './components/SettingsView';
 import UserManagementView from './components/UserManagementView';
 
-const API_BASE = window.location.port === "8000" ? "" : "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || (window.location.port === "8000" ? "" : "http://localhost:8000");
 
 const LOGIN_PROFILES = [
   { username: 'admin', name: 'Induction Admin', role: 'admin' },
