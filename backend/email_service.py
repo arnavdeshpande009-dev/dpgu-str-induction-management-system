@@ -164,10 +164,8 @@ def send_email(
 <head>
     <meta charset="utf-8">
 </head>
-<body style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #222222; line-height: 1.5; background-color: #ffffff; margin: 0; padding: 20px;">
-    <div style="max-width: 800px; margin: 0 auto;">
-        {formatted_body}
-    </div>
+<body style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #222222; margin: 0; padding: 0;">
+{formatted_body}
 </body>
 </html>
 """
