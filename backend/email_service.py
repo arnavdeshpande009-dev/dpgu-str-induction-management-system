@@ -134,7 +134,6 @@ def send_email(
     event_date = "August 5, 2026"
     event_time = "09:00 AM"
     event_venue = "Main Auditorium"
-    event_dress_code = "Smart Casuals"
 
     if smtp_settings:
         mock_mode = smtp_settings.get("mock_email", mock_mode)
@@ -150,7 +149,6 @@ def send_email(
         event_date = smtp_settings.get("event_date") or event_date
         event_time = smtp_settings.get("event_time") or event_time
         event_venue = smtp_settings.get("event_venue") or event_venue
-        event_dress_code = smtp_settings.get("event_dress_code") or event_dress_code
         
     if not mock_mode and (not user or not pwd):
         mock_mode = True
@@ -176,8 +174,7 @@ def send_email(
             <strong>Event Details:</strong><br>
             📅 Date: {event_date}<br>
             ⏰ Reporting Time: {event_time}<br>
-            📍 Venue: {event_venue}<br>
-            👔 Dress Code: {event_dress_code}
+            📍 Venue: {event_venue}
         </div>
         <p style="font-size: 13px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 15px; margin-top: 25px;">
             This is an automated email. Please do not reply directly to this message.

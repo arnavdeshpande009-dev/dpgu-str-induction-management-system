@@ -42,8 +42,7 @@ def init_db():
             email_body TEXT DEFAULT 'Congratulations on your admission to DPGU STR! We are thrilled to welcome you to our community.\n\nAttached to this email, you will find your unique Induction Check-In QR Pass (PNG image). Please download and save this pass on your mobile device. You will need to present this QR code at the registration desk for check-in on the day of the event.',
             event_date TEXT DEFAULT 'August 5, 2026',
             event_time TEXT DEFAULT '09:00 AM',
-            event_venue TEXT DEFAULT 'Main Auditorium',
-            event_dress_code TEXT DEFAULT 'Smart Casuals'
+            event_venue TEXT DEFAULT 'Main Auditorium'
         )
     """)
     
@@ -66,10 +65,6 @@ def init_db():
         pass
     try:
         cursor.execute("ALTER TABLE settings ADD COLUMN event_venue TEXT DEFAULT 'Main Auditorium'")
-    except Exception:
-        pass
-    try:
-        cursor.execute("ALTER TABLE settings ADD COLUMN event_dress_code TEXT DEFAULT 'Smart Casuals'")
     except Exception:
         pass
     
@@ -121,8 +116,7 @@ def update_settings(settings_dict):
             email_body = ?,
             event_date = ?,
             event_time = ?,
-            event_venue = ?,
-            event_dress_code = ?
+            event_venue = ?
         WHERE id = 1
     """, (
         1 if settings_dict.get("mock_email", True) else 0,
@@ -136,8 +130,7 @@ def update_settings(settings_dict):
         settings_dict.get("email_body", ""),
         settings_dict.get("event_date", "August 5, 2026"),
         settings_dict.get("event_time", "09:00 AM"),
-        settings_dict.get("event_venue", "Main Auditorium"),
-        settings_dict.get("event_dress_code", "Smart Casuals")
+        settings_dict.get("event_venue", "Main Auditorium")
     ))
     conn.commit()
     conn.close()

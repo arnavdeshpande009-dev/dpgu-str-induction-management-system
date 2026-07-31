@@ -44,7 +44,6 @@ class EmailConfigRequest(BaseModel):
     event_date: Optional[str] = "August 5, 2026"
     event_time: Optional[str] = "09:00 AM"
     event_venue: Optional[str] = "Main Auditorium"
-    event_dress_code: Optional[str] = "Smart Casuals"
 
 class UserLoginRequest(BaseModel):
     username: str

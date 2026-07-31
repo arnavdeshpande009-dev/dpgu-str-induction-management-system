@@ -13,7 +13,6 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
   const [eventVenue, setEventVenue] = useState("");
-  const [eventDressCode, setEventDressCode] = useState("");
   
   const [attachments, setAttachments] = useState([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -35,7 +34,6 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
         setEventDate(data.event_date || "");
         setEventTime(data.event_time || "");
         setEventVenue(data.event_venue || "");
-        setEventDressCode(data.event_dress_code || "");
       }
     } catch (err) {
       console.error(err);
@@ -69,8 +67,7 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
         email_body: emailBody,
         event_date: eventDate,
         event_time: eventTime,
-        event_venue: eventVenue,
-        event_dress_code: eventDressCode
+        event_venue: eventVenue
       };
 
       const res = await fetch(`${apiBase}/api/settings`, {
@@ -409,29 +406,16 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-              <div className="form-group">
-                <label className="form-label">Venue</label>
-                <input 
-                  type="text" 
-                  className="settings-input" 
-                  value={eventVenue}
-                  onChange={(e) => setEventVenue(e.target.value)}
-                  placeholder="e.g. Main Auditorium"
-                  style={{ width: '100%' }}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Dress Code</label>
-                <input 
-                  type="text" 
-                  className="settings-input" 
-                  value={eventDressCode}
-                  onChange={(e) => setEventDressCode(e.target.value)}
-                  placeholder="e.g. Smart Casuals"
-                  style={{ width: '100%' }}
-                />
-              </div>
+            <div className="form-group">
+              <label className="form-label">Venue</label>
+              <input 
+                type="text" 
+                className="settings-input" 
+                value={eventVenue}
+                onChange={(e) => setEventVenue(e.target.value)}
+                placeholder="e.g. Main Auditorium"
+                style={{ width: '100%' }}
+              />
             </div>
 
             <button 

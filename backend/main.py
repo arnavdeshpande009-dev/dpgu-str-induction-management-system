@@ -253,8 +253,7 @@ def get_settings():
         email_body=settings.get("email_body") or "",
         event_date=settings.get("event_date") or "August 5, 2026",
         event_time=settings.get("event_time") or "09:00 AM",
-        event_venue=settings.get("event_venue") or "Main Auditorium",
-        event_dress_code=settings.get("event_dress_code") or "Smart Casuals"
+        event_venue=settings.get("event_venue") or "Main Auditorium"
     )
 
 @app.post("/api/settings")
