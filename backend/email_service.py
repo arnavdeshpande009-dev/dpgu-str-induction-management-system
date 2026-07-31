@@ -89,8 +89,8 @@ def send_email(
     except Exception:
         font = ImageFont.load_default()
         
-    draw.text((231, 801), student_name, font=font, fill='#1e1b4b')
-    draw.text((331, 853), student_department, font=font, fill='#1e1b4b')
+    draw.text((250, 785), student_name, font=font, fill='#1e1b4b')
+    draw.text((330, 840), student_department, font=font, fill='#1e1b4b')
     
     # Centered student ID text below the QR code (ends at Y=682, Name starts at Y=801)
     id_text = f"ID: {student_id}"
