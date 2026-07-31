@@ -1,0 +1,35 @@
+# Python dependencies and environments
+.venv/
+backend/.venv/
+__pycache__/
+backend/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# SQLite Database
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Node dependencies
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Local static uploads and dynamically generated assets
+backend/uploads/
+backend/static/sent_emails/*
+backend/static/qrcodes/*
+uploads/
+static/
+
+# Environment configurations
+.env
+backend/.env
+frontend/.env
+
+# Keep directories but ignore files
+!backend/static/sent_emails/.gitkeep
+!backend/static/qrcodes/.gitkeep
