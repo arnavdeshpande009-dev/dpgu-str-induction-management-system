@@ -166,7 +166,6 @@ def send_email(
 </head>
 <body style="font-family: Arial, sans-serif; background-color: #f4f5f7; padding: 20px; color: #1e1b4b; margin: 0;">
     <div style="max-width: 600px; background-color: #ffffff; margin: 20px auto; border-radius: 12px; padding: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border: 1px solid #e5e7eb;">
-        <h2 style="color: #1e1b4b; margin-top: 0;">Welcome, {student_name}!</h2>
         <p style="line-height: 1.6; color: #4b5563; font-size: 15px;">
             {formatted_body}
         </p>
@@ -187,7 +186,7 @@ def send_email(
     try:
         # Create standard multipart message
         msg = MIMEMultipart()
-        msg["Subject"] = f"{email_subject} - {student_name}"
+        msg["Subject"] = email_subject
         msg["From"] = f"{sender_name} <{sender}>"
         msg["To"] = student_email
         
