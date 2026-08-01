@@ -19,7 +19,18 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 # Initialize database on startup
-database.init_db()
+import sys
+print(f"[STARTUP] DATABASE_URL configured: {'YES' if config.DATABASE_URL else 'NO'}", flush=True)
+print(f"[STARTUP] IS_POSTGRES: {config.IS_POSTGRES}", flush=True)
+print(f"[STARTUP] DATABASE_URL prefix: {config.DATABASE_URL[:30] if config.DATABASE_URL else 'NONE'}", flush=True)
+try:
+    database.init_db()
+    print("[STARTUP] Database initialized successfully.", flush=True)
+except Exception as e:
+    import traceback
+    print(f"[STARTUP ERROR] Failed to initialize database: {e}", flush=True)
+    traceback.print_exc()
+    sys.exit(1)
 
 app = FastAPI(
     title="DPGU STR Induction Management API",
