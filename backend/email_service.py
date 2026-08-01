@@ -57,12 +57,25 @@ def send_email(
     
     # Generate the customized PNG card pass
     # 1. Load card template
-    template_path = os.path.join("static", "card_template.png")
-    if not os.path.exists(template_path):
-        template_path = os.path.join("backend", "static", "card_template.png")
+    search_paths = [
+        "ticket.jpeg",
+        "backend/ticket.jpeg",
+        os.path.join("static", "card_template.png"),
+        os.path.join("backend", "static", "card_template.png")
+    ]
+    template_path = None
+    for p in search_paths:
+        if os.path.exists(p):
+            template_path = p
+            break
         
     try:
-        card = Image.open(template_path).convert('RGB')
+        if template_path:
+            card = Image.open(template_path).convert('RGB')
+            if card.size != (665, 882):
+                card = card.resize((665, 882))
+        else:
+            raise FileNotFoundError("No template image found")
     except Exception as e:
         print(f"Error opening card template: {e}")
         # Create a fallback peach image if template is missing
