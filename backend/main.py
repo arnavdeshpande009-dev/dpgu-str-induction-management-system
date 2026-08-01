@@ -228,19 +228,25 @@ async def send_student_emails(
     if not rows:
         return {"message": "All students have already received their emails. No new emails to send."}
         
-    # Load the persisted SMTP / Mock settings from SQLite/Postgres database
-    active_settings = database.get_settings(dept)
-    
-    def process_email_queue(students_list, config_override):
+    def process_email_queue(students_list, default_dept):
         db_conn = database.get_db_connection()
         db_cursor = db_conn.cursor()
+        settings_cache = {}
+        
         for s in students_list:
+            # Resolve department: use the trigger department, or fall back to the student's department
+            s_dept = default_dept or s.get("department")
+            if s_dept not in settings_cache:
+                settings_cache[s_dept] = database.get_settings(s_dept)
+            
+            student_settings = settings_cache[s_dept]
+            
             success = email_service.send_email(
                 student_name=s["name"],
                 student_email=s["email"],
                 student_id=s["student_id"],
                 student_department=s.get("department", "General"),
-                smtp_settings=config_override
+                smtp_settings=student_settings
             )
             if success:
                 db_cursor.execute(
@@ -254,7 +260,7 @@ async def send_student_emails(
                 db_conn.commit()
         db_conn.close()
         
-    background_tasks.add_task(process_email_queue, [dict(r) for r in rows], active_settings)
+    background_tasks.add_task(process_email_queue, [dict(r) for r in rows], dept)
     
     return {"message": f"Queued {len(rows)} emails to send in the background."}
 
