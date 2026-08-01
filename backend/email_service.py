@@ -25,7 +25,7 @@ def generate_qr_base64(token: str) -> str:
     
     img = qr.make_image(fill_color="#1e1b4b", back_color="white")  # Deep indigo color for QR
     buffered = BytesIO()
-    img.save(buffered, format="PNG")
+    getattr(img, "save")(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 def generate_qr_file(token: str, filename: str) -> str:
