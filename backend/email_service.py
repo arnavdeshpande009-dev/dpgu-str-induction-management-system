@@ -172,7 +172,9 @@ def send_email(
         event_time = smtp_settings.get("event_time") or event_time
         event_venue = smtp_settings.get("event_venue") or event_venue
         
-    mock_mode = False
+    if mock_mode:
+        print(f"[MOCK EMAIL] Simulating email sent to {student_email} (mock mode enabled)")
+        return True
         
     # Email HTML body
     formatted_body = email_body.replace("\n", "<br>")
