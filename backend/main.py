@@ -51,7 +51,10 @@ def read_root():
     }
 
 @app.post("/api/students/upload", response_model=models.StatsResponse)
-async def upload_students(file: UploadFile = File(...)):
+def upload_students(
+    file: UploadFile = File(...),
+    dept: Optional[str] = Query(None)
+):
     """Upload Excel/CSV file of students and save them to the database."""
     # Verify file extension
     ext = os.path.splitext(file.filename)[1].lower()
@@ -104,7 +107,7 @@ async def upload_students(file: UploadFile = File(...)):
         for index, row in df.iterrows():
             name = str(row[name_col]).strip()
             email = str(row[email_col]).strip()
-            department = str(row[dept_col]).strip() if dept_col and pd.notna(row[dept_col]) else "General"
+            department = str(row[dept_col]).strip() if dept_col and pd.notna(row[dept_col]) else (dept or "General")
             
             # Simple skip for empty rows
             if not name or not email or name.lower() == "nan" or email.lower() == "nan":
@@ -141,13 +144,14 @@ async def upload_students(file: UploadFile = File(...)):
         if os.path.exists(temp_path):
             os.remove(temp_path)
             
-    return get_stats()
+    return get_stats(dept)
 
 @app.get("/api/students", response_model=List[models.StudentResponse])
 def get_students(
     search: Optional[str] = Query(None, description="Search by name, email, or department"),
     checked_in: Optional[bool] = Query(None, description="Filter by check-in status"),
-    email_sent: Optional[bool] = Query(None, description="Filter by email sent status")
+    email_sent: Optional[bool] = Query(None, description="Filter by email sent status"),
+    dept: Optional[str] = Query(None)
 ):
     """Retrieve all students with optional search filters."""
     conn = database.get_db_connection()
@@ -163,11 +167,15 @@ def get_students(
         
     if checked_in is not None:
         query += " AND checked_in = ?"
-        params.append(1 if checked_in else 0)
+        params.append(True if checked_in else False)
         
     if email_sent is not None:
         query += " AND email_sent = ?"
-        params.append(1 if email_sent else 0)
+        params.append(True if email_sent else False)
+        
+    if dept:
+        query += " AND LOWER(department) = LOWER(?)"
+        params.append(dept)
         
     query += " ORDER BY id DESC"
     
@@ -193,20 +201,24 @@ def get_students(
 
 @app.post("/api/students/send-emails")
 async def send_student_emails(
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    dept: Optional[str] = Query(None)
 ):
     """Trigger email generation and delivery in the background for students who haven't received them yet."""
     conn = database.get_db_connection()
     cursor = conn.cursor()
     # Fetch all students who haven't received their email yet
-    rows = cursor.execute("SELECT * FROM students WHERE email_sent = 0").fetchall()
+    if dept:
+        rows = cursor.execute("SELECT * FROM students WHERE email_sent = FALSE AND LOWER(department) = LOWER(?)", (dept,)).fetchall()
+    else:
+        rows = cursor.execute("SELECT * FROM students WHERE email_sent = FALSE").fetchall()
     conn.close()
     
     if not rows:
         return {"message": "All students have already received their emails. No new emails to send."}
         
-    # Load the persisted SMTP / Mock settings from SQLite database
-    active_settings = database.get_settings()
+    # Load the persisted SMTP / Mock settings from SQLite/Postgres database
+    active_settings = database.get_settings(dept)
     
     def process_email_queue(students_list, config_override):
         db_conn = database.get_db_connection()
@@ -216,14 +228,14 @@ async def send_student_emails(
                 student_name=s["name"],
                 student_email=s["email"],
                 student_id=s["student_id"],
-                student_department=s.get("department", "Computer Science"),
+                student_department=s.get("department", "General"),
                 smtp_settings=config_override
             )
             if success:
                 db_cursor.execute(
                     """
                     UPDATE students
-                    SET email_sent = 1, email_sent_time = ?
+                    SET email_sent = TRUE, email_sent_time = ?
                     WHERE id = ?
                     """,
                     (datetime.now().isoformat(), s["id"])
@@ -236,9 +248,9 @@ async def send_student_emails(
     return {"message": f"Queued {len(rows)} emails to send in the background."}
 
 @app.get("/api/settings", response_model=models.EmailConfigRequest)
-def get_settings():
+def get_settings(dept: Optional[str] = Query(None)):
     """Retrieve active email configuration settings from database."""
-    settings = database.get_settings()
+    settings = database.get_settings(dept)
     if not settings:
         raise HTTPException(status_code=404, detail="Settings not found.")
     return models.EmailConfigRequest(
@@ -257,14 +269,14 @@ def get_settings():
     )
 
 @app.post("/api/settings")
-def save_settings(settings: models.EmailConfigRequest):
+def save_settings(settings: models.EmailConfigRequest, dept: Optional[str] = Query(None)):
     """Save email configuration settings to database."""
-    database.update_settings(settings.model_dump())
+    database.update_settings(settings.model_dump(), dept)
     return {"message": "Settings saved successfully."}
 
 @app.post("/api/students/checkin", response_model=models.CheckInResponse)
-def checkin_student(request: models.StudentCheckIn):
-    """Mark a student as checked in based on their unique QR token."""
+def checkin_student(request: models.StudentCheckIn, dept: Optional[str] = Query(None)):
+    """Mark a student as checked in after scanning their QR code, enforcing desk-specific validation."""
     conn = database.get_db_connection()
     cursor = conn.cursor()
     
@@ -277,18 +289,27 @@ def checkin_student(request: models.StudentCheckIn):
             message="Invalid QR Code. Student not found in database."
         )
         
-    if student["checked_in"]:
-        student_data = models.StudentResponse(
-            id=student["id"],
-            student_id=student["student_id"],
-            name=student["name"],
-            email=student["email"],
-            department=student["department"],
-            checked_in=bool(student["checked_in"]),
-            check_in_time=student["check_in_time"],
-            email_sent=bool(student["email_sent"]),
-            email_sent_time=student["email_sent_time"]
+    student_data = models.StudentResponse(
+        id=student["id"],
+        student_id=student["student_id"],
+        name=student["name"],
+        email=student["email"],
+        department=student["department"],
+        checked_in=bool(student["checked_in"]),
+        check_in_time=student["check_in_time"],
+        email_sent=bool(student["email_sent"]),
+        email_sent_time=student["email_sent_time"]
+    )
+    
+    if dept and student["department"] and student["department"].strip().lower() != dept.strip().lower():
+        conn.close()
+        return models.CheckInResponse(
+            success=False,
+            message=f"Student belongs to {student['department']} department. Please refer them to the {student['department']} desk.",
+            student=student_data
         )
+        
+    if student["checked_in"]:
         conn.close()
         return models.CheckInResponse(
             success=False,
@@ -300,7 +321,7 @@ def checkin_student(request: models.StudentCheckIn):
     cursor.execute(
         """
         UPDATE students
-        SET checked_in = 1, check_in_time = ?
+        SET checked_in = TRUE, check_in_time = ?
         WHERE student_id = ?
         """,
         (check_in_time, request.student_id)
@@ -329,7 +350,7 @@ def checkin_student(request: models.StudentCheckIn):
     )
 
 @app.post("/api/students/checkout", response_model=models.CheckInResponse)
-def checkout_student(request: models.StudentCheckIn):
+def checkout_student(request: models.StudentCheckIn, dept: Optional[str] = Query(None)):
     """Revert check-in status (mark as checked out/pending) for manual admin corrections."""
     conn = database.get_db_connection()
     cursor = conn.cursor()
@@ -343,10 +364,30 @@ def checkout_student(request: models.StudentCheckIn):
             message="Student not found."
         )
         
+    student_data = models.StudentResponse(
+        id=student["id"],
+        student_id=student["student_id"],
+        name=student["name"],
+        email=student["email"],
+        department=student["department"],
+        checked_in=bool(student["checked_in"]),
+        check_in_time=student["check_in_time"],
+        email_sent=bool(student["email_sent"]),
+        email_sent_time=student["email_sent_time"]
+    )
+    
+    if dept and student["department"] and student["department"].strip().lower() != dept.strip().lower():
+        conn.close()
+        return models.CheckInResponse(
+            success=False,
+            message=f"Student belongs to {student['department']} department. Cannot revert check-in from {dept} desk.",
+            student=student_data
+        )
+        
     cursor.execute(
         """
         UPDATE students
-        SET checked_in = 0, check_in_time = NULL
+        SET checked_in = FALSE, check_in_time = NULL
         WHERE student_id = ?
         """,
         (request.student_id,)
@@ -375,17 +416,22 @@ def checkout_student(request: models.StudentCheckIn):
     )
 
 @app.get("/api/stats", response_model=models.StatsResponse)
-def get_stats_endpoint():
+def get_stats_endpoint(dept: Optional[str] = Query(None)):
     """Fetch current system statistics."""
-    return get_stats()
+    return get_stats(dept)
 
-def get_stats() -> models.StatsResponse:
+def get_stats(dept: Optional[str] = None) -> models.StatsResponse:
     conn = database.get_db_connection()
     cursor = conn.cursor()
     
-    total = cursor.execute("SELECT COUNT(*) FROM students").fetchone()[0]
-    checked_in = cursor.execute("SELECT COUNT(*) FROM students WHERE checked_in = 1").fetchone()[0]
-    emails_sent = cursor.execute("SELECT COUNT(*) FROM students WHERE email_sent = 1").fetchone()[0]
+    if dept:
+        total = cursor.execute("SELECT COUNT(*) FROM students WHERE LOWER(department) = LOWER(?)", (dept,)).fetchone()[0]
+        checked_in = cursor.execute("SELECT COUNT(*) FROM students WHERE checked_in = TRUE AND LOWER(department) = LOWER(?)", (dept,)).fetchone()[0]
+        emails_sent = cursor.execute("SELECT COUNT(*) FROM students WHERE email_sent = TRUE AND LOWER(department) = LOWER(?)", (dept,)).fetchone()[0]
+    else:
+        total = cursor.execute("SELECT COUNT(*) FROM students").fetchone()[0]
+        checked_in = cursor.execute("SELECT COUNT(*) FROM students WHERE checked_in = TRUE").fetchone()[0]
+        emails_sent = cursor.execute("SELECT COUNT(*) FROM students WHERE email_sent = TRUE").fetchone()[0]
     
     conn.close()
     
@@ -401,11 +447,14 @@ def get_stats() -> models.StatsResponse:
     )
 
 @app.get("/api/students/export")
-def export_students():
+def export_students(dept: Optional[str] = Query(None)):
     """Export attendance list as a styled and protected Excel (.xlsx) file."""
     conn = database.get_db_connection()
     cursor = conn.cursor()
-    rows = cursor.execute("SELECT student_id, name, email, department, checked_in, check_in_time, email_sent, email_sent_time FROM students").fetchall()
+    if dept:
+        rows = cursor.execute("SELECT student_id, name, email, department, checked_in, check_in_time, email_sent, email_sent_time FROM students WHERE LOWER(department) = LOWER(?)", (dept,)).fetchall()
+    else:
+        rows = cursor.execute("SELECT student_id, name, email, department, checked_in, check_in_time, email_sent, email_sent_time FROM students").fetchall()
     conn.close()
     
     # Create workbook
@@ -453,7 +502,7 @@ def export_students():
         student_id = r["student_id"]
         name = r["name"]
         email = r["email"]
-        dept = r["department"] or "General"
+        dept_name = r["department"] or "General"
         
         checked_in = "Checked In" if bool(r["checked_in"]) else "Pending"
         check_in_time = r["check_in_time"] or "-"
@@ -462,7 +511,7 @@ def export_students():
         email_sent_time = r["email_sent_time"] or "-"
         
         row_data = [
-            student_id, name, email, dept, 
+            student_id, name, email, dept_name, 
             checked_in, check_in_time, email_sent, email_sent_time
         ]
         
@@ -524,27 +573,74 @@ def export_students():
     )
 
 @app.post("/api/students/reset")
-def reset_system():
-    """Clear all records and delete generated static files (QR codes, email previews)."""
-    database.clear_db()
+def reset_system(dept: Optional[str] = Query(None)):
+    """Clear all records and delete generated static files, optionally filtered by department."""
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
     
-    # Clean folders
-    for folder in [config.QRCODES_DIR, config.MOCK_EMAILS_DIR]:
-        if os.path.exists(folder):
-            for filename in os.listdir(folder):
-                file_path = os.path.join(folder, filename)
+    if dept:
+        # Fetch all students in this department to get their student_ids and emails
+        students = cursor.execute("SELECT student_id, email FROM students WHERE LOWER(department) = LOWER(?)", (dept,)).fetchall()
+        for s in students:
+            # Delete QR codes
+            qr_file = os.path.join(config.QRCODES_DIR, f"{s['student_id']}.png")
+            if os.path.exists(qr_file):
                 try:
-                    if os.path.isfile(file_path) or os.path.islink(file_path):
-                        os.unlink(file_path)
-                except Exception as e:
-                    print(f"Failed to delete {file_path}. Reason: {e}")
+                    os.unlink(qr_file)
+                except Exception:
+                    pass
+            # Delete mock email previews
+            preview_file = os.path.join(config.MOCK_EMAILS_DIR, f"{s['email']}_{s['student_id']}.png")
+            if os.path.exists(preview_file):
+                try:
+                    os.unlink(preview_file)
+                except Exception:
+                    pass
+            # Check for failed email previews
+            failed_preview_file = os.path.join(config.MOCK_EMAILS_DIR, f"FAILED_SMTP_{s['email']}_{s['student_id']}.png")
+            if os.path.exists(failed_preview_file):
+                try:
+                    os.unlink(failed_preview_file)
+                except Exception:
+                    pass
                     
-    return {"message": "Database wiped and all generated files deleted successfully."}
+        # Delete from students table
+        cursor.execute("DELETE FROM students WHERE LOWER(department) = LOWER(?)", (dept,))
+        # Delete department-specific settings row
+        cursor.execute("DELETE FROM settings WHERE LOWER(department) = LOWER(?)", (dept,))
+        conn.commit()
+        conn.close()
+        return {"message": f"Wiped all records and passes for department '{dept}'."}
+    else:
+        conn.close()
+        database.clear_db()
+        
+        # Clean folders
+        for folder in [config.QRCODES_DIR, config.MOCK_EMAILS_DIR]:
+            if os.path.exists(folder):
+                for filename in os.listdir(folder):
+                    file_path = os.path.join(folder, filename)
+                    try:
+                        if os.path.isfile(file_path) or os.path.islink(file_path):
+                            os.unlink(file_path)
+                    except Exception as e:
+                        print(f"Failed to delete {file_path}. Reason: {e}")
+                        
+        return {"message": "Database wiped and all generated files deleted successfully."}
 
 @app.get("/api/preview-emails")
-def get_mock_emails():
-    """Return list of generated PNG passes for preview."""
+def get_mock_emails(dept: Optional[str] = Query(None)):
+    """Return list of generated PNG passes for preview, optionally filtered by department."""
     emails = []
+    
+    dept_student_ids = set()
+    if dept:
+        conn = database.get_db_connection()
+        cursor = conn.cursor()
+        rows = cursor.execute("SELECT student_id FROM students WHERE LOWER(department) = LOWER(?)", (dept,)).fetchall()
+        conn.close()
+        dept_student_ids = {r["student_id"] for r in rows}
+        
     if os.path.exists(config.MOCK_EMAILS_DIR):
         for f in os.listdir(config.MOCK_EMAILS_DIR):
             if f.endswith(".png"):
@@ -558,6 +654,9 @@ def get_mock_emails():
                 else:
                     email_part, id_part = name_without_ext.rsplit("_", 1)
                 
+                if dept and id_part not in dept_student_ids:
+                    continue
+                    
                 emails.append({
                     "filename": f,
                     "email": email_part,
@@ -567,19 +666,38 @@ def get_mock_emails():
     return emails
 
 @app.post("/api/preview-emails/clear")
-def clear_preview_emails():
-    """Clear all generated preview PNG files in the local static/sent_emails directory."""
-    count = 0
-    if os.path.exists(config.MOCK_EMAILS_DIR):
-        for f in os.listdir(config.MOCK_EMAILS_DIR):
-            file_path = os.path.join(config.MOCK_EMAILS_DIR, f)
+def clear_mock_emails(dept: Optional[str] = Query(None)):
+    """Clear generated PNG email passes, optionally filtered by department."""
+    if not os.path.exists(config.MOCK_EMAILS_DIR):
+        return {"message": "Previews folder empty."}
+        
+    dept_student_ids = set()
+    if dept:
+        conn = database.get_db_connection()
+        cursor = conn.cursor()
+        rows = cursor.execute("SELECT student_id FROM students WHERE LOWER(department) = LOWER(?)", (dept,)).fetchall()
+        conn.close()
+        dept_student_ids = {r["student_id"] for r in rows}
+        
+    for filename in os.listdir(config.MOCK_EMAILS_DIR):
+        if filename.endswith(".png"):
+            if dept:
+                name_without_ext = filename[:-4]
+                try:
+                    if "_" in name_without_ext:
+                        id_part = name_without_ext.split("_")[-1]
+                        if id_part not in dept_student_ids:
+                            continue
+                except Exception:
+                    continue
+                    
+            file_path = os.path.join(config.MOCK_EMAILS_DIR, filename)
             try:
-                if os.path.isfile(file_path) or os.path.islink(file_path):
-                    os.unlink(file_path)
-                    count += 1
-            except Exception as e:
-                print(f"Failed to delete preview file {file_path}: {e}")
-    return {"success": True, "message": f"Cleared {count} preview pass images."}
+                os.unlink(file_path)
+            except Exception:
+                pass
+                
+    return {"message": "Mock email previews cleared successfully."}
 
 @app.post("/api/settings/test-smtp")
 def test_smtp_connection(settings: models.EmailConfigRequest):
@@ -605,6 +723,15 @@ def test_smtp_connection(settings: models.EmailConfigRequest):
     except Exception as e:
         return {"success": False, "message": str(e)}
 
+@app.get("/api/auth/profiles", response_model=List[models.UserResponse])
+def get_auth_profiles():
+    """Retrieve all user profiles for login selection."""
+    conn = database.get_db_connection()
+    cursor = conn.cursor()
+    rows = cursor.execute("SELECT id, username, name, role, department, is_authorized FROM users ORDER BY role ASC, name ASC").fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
 @app.post("/api/auth/login", response_model=models.UserResponse)
 def login(payload: models.UserLoginRequest):
     """Authenticate a user profile using a 4-digit PIN."""
@@ -626,11 +753,14 @@ def login(payload: models.UserLoginRequest):
     return user
 
 @app.get("/api/users", response_model=List[models.UserResponse])
-def get_users():
+def get_users(dept: Optional[str] = Query(None)):
     """List all pre-configured employee users."""
     conn = database.get_db_connection()
     cursor = conn.cursor()
-    rows = cursor.execute("SELECT * FROM users WHERE role = 'employee'").fetchall()
+    if dept:
+        rows = cursor.execute("SELECT * FROM users WHERE role = 'employee' AND LOWER(department) = LOWER(?)", (dept,)).fetchall()
+    else:
+        rows = cursor.execute("SELECT * FROM users WHERE role = 'employee'").fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
@@ -644,7 +774,7 @@ def toggle_user_auth(username: str):
         conn.close()
         raise HTTPException(status_code=404, detail="User not found.")
         
-    new_status = 0 if row["is_authorized"] else 1
+    new_status = False if row["is_authorized"] else True
     cursor.execute("UPDATE users SET is_authorized = ? WHERE username = ?", (new_status, username))
     conn.commit()
     conn.close()
@@ -731,8 +861,8 @@ def get_system_integrity():
         missing_departments = []
         
         # Get stats counts
-        emails_sent = cursor.execute("SELECT COUNT(*) FROM students WHERE email_sent = 1").fetchone()[0]
-        checked_in = cursor.execute("SELECT COUNT(*) FROM students WHERE checked_in = 1").fetchone()[0]
+        emails_sent = cursor.execute("SELECT COUNT(*) FROM students WHERE email_sent = TRUE").fetchone()[0]
+        checked_in = cursor.execute("SELECT COUNT(*) FROM students WHERE checked_in = TRUE").fetchone()[0]
         
         # Check duplicate student IDs
         duplicates_query = cursor.execute("""

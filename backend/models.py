@@ -55,3 +55,4 @@ class UserResponse(BaseModel):
     name: str
     role: str
     is_authorized: bool
+    department: Optional[str] = None

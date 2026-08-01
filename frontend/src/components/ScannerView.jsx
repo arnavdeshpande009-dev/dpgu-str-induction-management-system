@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 
-export default function ScannerView({ fetchStats, showToast, apiBase }) {
+export default function ScannerView({ fetchStats, showToast, apiBase, currentUser }) {
   const [scanHistory, setScanHistory] = useState([]);
   const [activeScan, setActiveScan] = useState(false);
   const [currentResult, setCurrentResult] = useState(null); // { success: bool, name: str, message: str }
@@ -117,7 +117,8 @@ export default function ScannerView({ fetchStats, showToast, apiBase }) {
     }
 
     try {
-      const res = await fetch(`${apiBase}/api/students/checkin`, {
+      const deptQuery = currentUser?.department ? `?dept=${encodeURIComponent(currentUser.department)}` : "";
+      const res = await fetch(`${apiBase}/api/students/checkin${deptQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ student_id: token })

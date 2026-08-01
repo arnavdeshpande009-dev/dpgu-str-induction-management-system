@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 
-export default function UserManagementView({ apiBase, showToast }) {
+export default function UserManagementView({ apiBase, showToast, currentUser }) {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchEmployees();
-  }, []);
+  }, [currentUser]);
 
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${apiBase}/api/users`);
+      const deptQuery = currentUser?.department ? `?dept=${encodeURIComponent(currentUser.department)}` : "";
+      const res = await fetch(`${apiBase}/api/users${deptQuery}`);
       if (res.ok) {
         const data = await res.json();
         setEmployees(data);

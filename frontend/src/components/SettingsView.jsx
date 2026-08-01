@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
-export default function SettingsView({ stats, fetchStats, showToast, apiBase }) {
-  const [mockEmail, setMockEmail] = useState(true);
+export default function SettingsView({ stats, fetchStats, showToast, apiBase, currentUser }) {
+  const [mockEmail, setMockEmail] = useState(false);
   const [smtpHost, setSmtpHost] = useState("smtp.gmail.com");
   const [smtpPort, setSmtpPort] = useState(587);
   const [smtpUser, setSmtpUser] = useState("");
@@ -14,13 +14,15 @@ export default function SettingsView({ stats, fetchStats, showToast, apiBase }) 
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [wipingDb, setWipingDb] = useState(false);
 
+  const deptQuery = currentUser?.department ? `?dept=${encodeURIComponent(currentUser.department)}` : "";
+
   useEffect(() => {
     loadSettings();
-  }, []);
+  }, [currentUser]);
 
   const loadSettings = async () => {
     try {
-      const res = await fetch(`${apiBase}/api/settings`);
+      const res = await fetch(`${apiBase}/api/settings${deptQuery}`);
       if (res.ok) {
         const data = await res.json();
         setMockEmail(data.mock_email);
@@ -50,13 +52,13 @@ export default function SettingsView({ stats, fetchStats, showToast, apiBase }) 
     };
 
     try {
-      const res = await fetch(`${apiBase}/api/settings`, {
+      const res = await fetch(`${apiBase}/api/settings${deptQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(settingsPayload)
       });
       if (res.ok) {
-        showToast("Success", "Configuration settings saved permanently.", "success");
+        showToast("Success", `Configuration settings saved for ${currentUser?.department || 'System'}.`, "success");
         fetchStats();
       } else {
         showToast("Error", "Failed to save configuration settings.", "error");
@@ -105,11 +107,11 @@ export default function SettingsView({ stats, fetchStats, showToast, apiBase }) 
     if (resetConfirmText !== "RESET") return;
     setWipingDb(true);
     try {
-      const res = await fetch(`${apiBase}/api/students/reset`, {
+      const res = await fetch(`${apiBase}/api/students/reset${deptQuery}`, {
         method: "POST"
       });
       if (res.ok) {
-        showToast("System Reset", "All student data and generated codes have been wiped.", "success");
+        showToast("System Reset", `All data for ${currentUser?.department || 'all departments'} has been wiped.`, "success");
         setResetConfirmText("");
         fetchStats();
       } else {
@@ -133,109 +135,88 @@ export default function SettingsView({ stats, fetchStats, showToast, apiBase }) 
           </h2>
         </div>
 
-        <div className="toggle-switch-container">
-          <div className="toggle-switch-info">
-            <h3>Mock Mode (Dry-Run Preview)</h3>
-            <p>Save emails locally as HTML instead of sending real emails.</p>
+        <form onSubmit={handleTestSmtp}>
+          <div className="settings-row-grid">
+            <div className="settings-form-group">
+              <label className="settings-label">SMTP Server Host</label>
+              <input 
+                type="text" 
+                className="settings-input" 
+                value={smtpHost}
+                onChange={(e) => setSmtpHost(e.target.value)}
+                required
+              />
+            </div>
+            <div className="settings-form-group">
+              <label className="settings-label">Port</label>
+              <input 
+                type="number" 
+                className="settings-input" 
+                value={smtpPort}
+                onChange={(e) => setSmtpPort(parseInt(e.target.value))}
+                required
+              />
+            </div>
           </div>
-          <input 
-            type="checkbox" 
-            className="toggle-switch-input"
-            checked={mockEmail}
-            onChange={(e) => setMockEmail(e.target.checked)}
-          />
-        </div>
 
-        {!mockEmail && (
-          <form onSubmit={handleTestSmtp}>
-            <div className="settings-row-grid">
-              <div className="settings-form-group">
-                <label className="settings-label">SMTP Server Host</label>
-                <input 
-                  type="text" 
-                  className="settings-input" 
-                  value={smtpHost}
-                  onChange={(e) => setSmtpHost(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="settings-form-group">
-                <label className="settings-label">Port</label>
-                <input 
-                  type="number" 
-                  className="settings-input" 
-                  value={smtpPort}
-                  onChange={(e) => setSmtpPort(parseInt(e.target.value))}
-                  required
-                />
-              </div>
+          <div className="settings-row-grid">
+            <div className="settings-form-group">
+              <label className="settings-label">Username / Username Email</label>
+              <input 
+                type="text" 
+                className="settings-input" 
+                value={smtpUser}
+                onChange={(e) => setSmtpUser(e.target.value)}
+                placeholder="e.g. admin@gmail.com"
+                required
+              />
             </div>
-
-            <div className="settings-row-grid">
-              <div className="settings-form-group">
-                <label className="settings-label">Username / Username Email</label>
-                <input 
-                  type="text" 
-                  className="settings-input" 
-                  value={smtpUser}
-                  onChange={(e) => setSmtpUser(e.target.value)}
-                  placeholder="e.g. admin@gmail.com"
-                  required
-                />
-              </div>
-              <div className="settings-form-group">
-                <label className="settings-label">Password / App Password</label>
-                <input 
-                  type="password" 
-                  className="settings-input" 
-                  value={smtpPassword}
-                  onChange={(e) => setSmtpPassword(e.target.value)}
-                  placeholder="SMTP account password"
-                  required
-                />
-              </div>
+            <div className="settings-form-group">
+              <label className="settings-label">Password / App Password</label>
+              <input 
+                type="password" 
+                className="settings-input" 
+                value={smtpPassword}
+                onChange={(e) => setSmtpPassword(e.target.value)}
+                placeholder="SMTP account password"
+                required
+              />
             </div>
-
-            <div className="settings-row-grid">
-              <div className="settings-form-group">
-                <label className="settings-label">Sender Email Address</label>
-                <input 
-                  type="email" 
-                  className="settings-input" 
-                  value={smtpFrom}
-                  onChange={(e) => setSmtpFrom(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="settings-form-group">
-                <label className="settings-label">Sender Display Name</label>
-                <input 
-                  type="text" 
-                  className="settings-input" 
-                  value={smtpFromName}
-                  onChange={(e) => setSmtpFromName(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-              <button 
-                type="submit" 
-                className="btn btn-primary"
-                disabled={testingSmtp}
-              >
-                {testingSmtp ? "Connecting & Sending..." : "Test SMTP Connection"}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {mockEmail && (
-          <div style={{ padding: '16px', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.15)', fontSize: '13px', color: 'var(--text-secondary)' }}>
-            <strong>💡 Local Mock Preview Mode is active.</strong> Passes will be rendered and stored inside <code>backend/static/sent_emails/</code>. You can review them directly from the dashboard view. No emails will actually be sent to student addresses.
           </div>
-        )}
+
+          <div className="settings-row-grid">
+            <div className="settings-form-group">
+              <label className="settings-label">Sender Email Address</label>
+              <input 
+                type="email" 
+                className="settings-input" 
+                value={smtpFrom}
+                onChange={(e) => setSmtpFrom(e.target.value)}
+                required
+              />
+            </div>
+            <div className="settings-form-group">
+              <label className="settings-label">Sender Display Name</label>
+              <input 
+                type="text" 
+                className="settings-input" 
+                value={smtpFromName}
+                onChange={(e) => setSmtpFromName(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+            <button 
+              type="submit" 
+              className="btn btn-primary"
+              disabled={testingSmtp}
+            >
+              {testingSmtp ? "Connecting & Sending..." : "Test SMTP Connection"}
+            </button>
+          </div>
+        </form>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '20px' }}>
           <button 

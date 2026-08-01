@@ -8,14 +8,7 @@ import SystemHealthView from './components/SystemHealthView';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || (window.location.port === "8000" ? "" : "http://localhost:8000");
 
-const LOGIN_PROFILES = [
-  { username: 'admin', name: 'Induction Admin', role: 'admin' },
-  ...Array.from({ length: 10 }, (_, i) => ({
-    username: `emp${i + 1}`,
-    name: `Employee ${i + 1}`,
-    role: `employee`
-  }))
-];
+// Login profiles loaded dynamically from backend on startup
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -28,6 +21,27 @@ export default function App() {
   const [loginPin, setLoginPin] = useState('');
   const [loginError, setLoginError] = useState('');
   const [authenticating, setAuthenticating] = useState(false);
+  const [profiles, setProfiles] = useState([
+    { username: 'admin', name: 'System Admin', role: 'admin', department: null }
+  ]);
+
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/profiles`);
+        if (res.ok) {
+          const data = await res.json();
+          setProfiles(data);
+          if (data.length > 0) {
+            setLoginUsername(data[0].username);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load profiles dynamically:", err);
+      }
+    };
+    fetchProfiles();
+  }, []);
 
   const [stats, setStats] = useState({
     total_students: 0,
@@ -52,7 +66,8 @@ export default function App() {
   const fetchStats = async () => {
     if (!currentUser || currentUser.role !== 'admin') return;
     try {
-      const res = await fetch(`${API_BASE}/api/stats`);
+      const deptQuery = currentUser.department ? `?dept=${encodeURIComponent(currentUser.department)}` : "";
+      const res = await fetch(`${API_BASE}/api/stats${deptQuery}`);
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -122,6 +137,7 @@ export default function App() {
             fetchStats={fetchStats} 
             showToast={showToast} 
             apiBase={API_BASE} 
+            currentUser={currentUser}
           />
         ) : null;
       case 'attendance':
@@ -138,6 +154,7 @@ export default function App() {
             fetchStats={fetchStats} 
             showToast={showToast} 
             apiBase={API_BASE} 
+            currentUser={currentUser}
           />
         );
       case 'users':
@@ -145,6 +162,7 @@ export default function App() {
           <UserManagementView 
             apiBase={API_BASE} 
             showToast={showToast} 
+            currentUser={currentUser}
           />
         ) : null;
       case 'settings':
@@ -154,6 +172,7 @@ export default function App() {
             fetchStats={fetchStats} 
             showToast={showToast} 
             apiBase={API_BASE} 
+            currentUser={currentUser}
           />
         ) : null;
       case 'health':
@@ -161,6 +180,7 @@ export default function App() {
           <SystemHealthView 
             apiBase={API_BASE} 
             showToast={showToast} 
+            currentUser={currentUser}
           />
         ) : null;
       default:
@@ -195,9 +215,9 @@ export default function App() {
                 className="settings-input"
                 style={{ width: '100%', cursor: 'pointer' }}
               >
-                {LOGIN_PROFILES.map((prof) => (
+                {profiles.map((prof) => (
                   <option key={prof.username} value={prof.username}>
-                    {prof.name} ({prof.role === 'admin' ? 'Admin' : 'Employee'})
+                    {prof.name} ({prof.role === 'admin' ? `${prof.department || 'System'} Admin` : `${prof.department || 'System'} Staff`})
                   </option>
                 ))}
               </select>

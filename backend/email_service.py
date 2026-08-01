@@ -172,12 +172,7 @@ def send_email(
         event_time = smtp_settings.get("event_time") or event_time
         event_venue = smtp_settings.get("event_venue") or event_venue
         
-    if not mock_mode and (not user or not pwd):
-        mock_mode = True
-        
-    if mock_mode:
-        # Mock mode: we already saved the preview PNG to MOCK_EMAILS_DIR, so we are done
-        return True
+    mock_mode = False
         
     # Email HTML body
     formatted_body = email_body.replace("\n", "<br>")

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function DashboardView({ stats, fetchStats, showToast, apiBase }) {
+export default function DashboardView({ stats, fetchStats, showToast, apiBase, currentUser }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -18,15 +18,17 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
 
+  const deptQuery = currentUser?.department ? `?dept=${encodeURIComponent(currentUser.department)}` : "";
+
   useEffect(() => {
     fetchMockEmails();
     loadEmailSettings();
     loadAttachments();
-  }, []);
+  }, [currentUser]);
 
   const loadEmailSettings = async () => {
     try {
-      const res = await fetch(`${apiBase}/api/settings`);
+      const res = await fetch(`${apiBase}/api/settings${deptQuery}`);
       if (res.ok) {
         const data = await res.json();
         setEmailSubject(data.email_subject || "");
@@ -55,7 +57,7 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
   const handleSaveTemplate = async () => {
     setSavingTemplate(true);
     try {
-      const settingsRes = await fetch(`${apiBase}/api/settings`);
+      const settingsRes = await fetch(`${apiBase}/api/settings${deptQuery}`);
       let existingSettings = {};
       if (settingsRes.ok) {
         existingSettings = await settingsRes.json();
@@ -70,7 +72,7 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
         event_venue: eventVenue
       };
 
-      const res = await fetch(`${apiBase}/api/settings`, {
+      const res = await fetch(`${apiBase}/api/settings${deptQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -153,7 +155,7 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
 
   const fetchMockEmails = async () => {
     try {
-      const res = await fetch(`${apiBase}/api/preview-emails`);
+      const res = await fetch(`${apiBase}/api/preview-emails${deptQuery}`);
       if (res.ok) {
         const data = await res.json();
         setMockEmails(data);
@@ -168,7 +170,7 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
       return;
     }
     try {
-      const res = await fetch(`${apiBase}/api/preview-emails/clear`, {
+      const res = await fetch(`${apiBase}/api/preview-emails/clear${deptQuery}`, {
         method: "POST"
       });
       if (res.ok) {
@@ -214,7 +216,7 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
     formData.append("file", selectedFile);
 
     try {
-      const res = await fetch(`${apiBase}/api/students/upload`, {
+      const res = await fetch(`${apiBase}/api/students/upload${deptQuery}`, {
         method: "POST",
         body: formData,
       });
@@ -238,7 +240,7 @@ export default function DashboardView({ stats, fetchStats, showToast, apiBase })
   const handleSendEmails = async () => {
     setSendingEmails(true);
     try {
-      const res = await fetch(`${apiBase}/api/students/send-emails`, {
+      const res = await fetch(`${apiBase}/api/students/send-emails${deptQuery}`, {
         method: "POST",
       });
       const data = await res.json();
