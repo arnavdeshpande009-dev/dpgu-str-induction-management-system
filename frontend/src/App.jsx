@@ -4,6 +4,7 @@ import AttendanceView from './components/AttendanceView';
 import ScannerView from './components/ScannerView';
 import SettingsView from './components/SettingsView';
 import UserManagementView from './components/UserManagementView';
+import SystemHealthView from './components/SystemHealthView';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || (window.location.port === "8000" ? "" : "http://localhost:8000");
 
@@ -155,6 +156,13 @@ export default function App() {
             apiBase={API_BASE} 
           />
         ) : null;
+      case 'health':
+        return currentUser.role === 'admin' ? (
+          <SystemHealthView 
+            apiBase={API_BASE} 
+            showToast={showToast} 
+          />
+        ) : null;
       default:
         return null;
     }
@@ -299,6 +307,14 @@ export default function App() {
               onClick={() => setActiveTab('settings')}
             >
               ⚙ Settings
+            </button>
+          )}
+          {currentUser.role === 'admin' && (
+            <button 
+              className={`nav-tab ${activeTab === 'health' ? 'active' : ''}`}
+              onClick={() => setActiveTab('health')}
+            >
+              🩺 System Health
             </button>
           )}
         </nav>

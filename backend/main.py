@@ -268,7 +268,7 @@ def checkin_student(request: models.StudentCheckIn):
     conn = database.get_db_connection()
     cursor = conn.cursor()
     
-    student = cursor.execute("SELECT * FROM students WHERE student_id = ?", (request.student_id,)).fetchone()
+    student = cursor.execute("SELECT * FROM students WHERE student_id = ? FOR UPDATE", (request.student_id,)).fetchone()
     
     if not student:
         conn.close()
@@ -334,7 +334,7 @@ def checkout_student(request: models.StudentCheckIn):
     conn = database.get_db_connection()
     cursor = conn.cursor()
     
-    student = cursor.execute("SELECT * FROM students WHERE student_id = ?", (request.student_id,)).fetchone()
+    student = cursor.execute("SELECT * FROM students WHERE student_id = ? FOR UPDATE", (request.student_id,)).fetchone()
     
     if not student:
         conn.close()
@@ -693,3 +693,138 @@ def delete_attachment(filename: str):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to delete attachment: {e}")
     raise HTTPException(status_code=404, detail="Attachment file not found.")
+
+@app.get("/api/system/health")
+def get_system_health():
+    """Check backend database connection and status."""
+    try:
+        conn = database.get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        conn.close()
+        return {
+            "status": "online",
+            "database": "postgresql" if config.IS_POSTGRES else "sqlite",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "offline",
+            "error": str(e),
+            "database": "postgresql" if config.IS_POSTGRES else "sqlite",
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/api/system/integrity")
+def get_system_integrity():
+    """Run full diagnostic checks on the database records and file mappings."""
+    try:
+        conn = database.get_db_connection()
+        cursor = conn.cursor()
+        
+        students = cursor.execute("SELECT student_id, name, email, department FROM students").fetchall()
+        
+        total_students = len(students)
+        qr_exists_count = 0
+        missing_qrcodes = []
+        missing_emails = []
+        missing_departments = []
+        
+        # Get stats counts
+        emails_sent = cursor.execute("SELECT COUNT(*) FROM students WHERE email_sent = 1").fetchone()[0]
+        checked_in = cursor.execute("SELECT COUNT(*) FROM students WHERE checked_in = 1").fetchone()[0]
+        
+        # Check duplicate student IDs
+        duplicates_query = cursor.execute("""
+            SELECT student_id, COUNT(*) as cnt 
+            FROM students 
+            GROUP BY student_id 
+            HAVING COUNT(*) > 1
+        """).fetchall()
+        duplicate_student_ids = [{"student_id": d["student_id"], "count": d["cnt"]} for d in duplicates_query]
+        
+        # Check files and empty fields
+        for s in students:
+            s_id = s["student_id"]
+            qr_path = os.path.join(config.QRCODES_DIR, f"{s_id}.png")
+            if os.path.exists(qr_path):
+                qr_exists_count += 1
+            else:
+                missing_qrcodes.append({
+                    "student_id": s_id,
+                    "name": s["name"],
+                    "issue": "Missing QR Code file"
+                })
+                
+            email = s["email"]
+            if not email or email.strip() == "" or "@" not in email:
+                missing_emails.append({
+                    "student_id": s_id,
+                    "name": s["name"],
+                    "email": email or "",
+                    "issue": "Missing or invalid email"
+                })
+                
+            dept = s["department"]
+            if not dept or dept.strip() == "" or dept.lower() == "nan":
+                missing_departments.append({
+                    "student_id": s_id,
+                    "name": s["name"],
+                    "issue": "Missing department"
+                })
+                
+        conn.close()
+        
+        return {
+            "db_status": "online",
+            "db_type": "postgresql" if config.IS_POSTGRES else "sqlite",
+            "total_students": total_students,
+            "total_qr_generated": qr_exists_count,
+            "total_emails_sent": emails_sent,
+            "total_attendance": checked_in,
+            "duplicates": duplicate_student_ids,
+            "missing_qrcodes": missing_qrcodes,
+            "missing_emails": missing_emails,
+            "missing_departments": missing_departments,
+            "last_sync_time": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to run integrity check: {str(e)}")
+
+@app.post("/api/system/integrity/check")
+def run_integrity_check_trigger():
+    """Triggers and returns validation status for the event readiness."""
+    res = get_system_integrity()
+    
+    total_issues = (
+        len(res["duplicates"]) + 
+        len(res["missing_qrcodes"]) + 
+        len(res["missing_emails"]) + 
+        len(res["missing_departments"])
+    )
+    
+    if total_issues == 0 and res["total_students"] > 0:
+        return {
+            "ready": True,
+            "message": "System Ready for Event",
+            "details": res
+        }
+    else:
+        issues_summary = []
+        if res["total_students"] == 0:
+            issues_summary.append("Database is empty. Please upload student roster.")
+        if len(res["duplicates"]) > 0:
+            issues_summary.append(f"Found {len(res['duplicates'])} duplicate student IDs.")
+        if len(res["missing_qrcodes"]) > 0:
+            issues_summary.append(f"Found {len(res['missing_qrcodes'])} missing QR code pass files.")
+        if len(res["missing_emails"]) > 0:
+            issues_summary.append(f"Found {len(res['missing_emails'])} students with missing/invalid emails.")
+        if len(res["missing_departments"]) > 0:
+            issues_summary.append(f"Found {len(res['missing_departments'])} students with missing departments.")
+            
+        return {
+            "ready": False,
+            "message": "Integrity check failed. Please resolve the listed issues before the event.",
+            "issues_summary": issues_summary,
+            "details": res
+        }

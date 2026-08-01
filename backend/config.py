@@ -1,8 +1,10 @@
 import os
 
-# We will use simple environment retrieval to keep things dependency-light and reliable
 DB_PATH = os.getenv("DB_PATH", "induction_system.db")
-DATABASE_URL = f"sqlite:///./{DB_PATH}"
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///./{DB_PATH}")
+
+# Flag to check if we are connecting to a PostgreSQL database
+IS_POSTGRES = DATABASE_URL.startswith("postgres://") or DATABASE_URL.startswith("postgresql://")
 
 # CORS Configuration
 ALLOWED_ORIGINS = [
