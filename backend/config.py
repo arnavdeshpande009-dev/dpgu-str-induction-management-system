@@ -1,7 +1,24 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
-DB_PATH = os.getenv("DB_PATH", "induction_system.db")
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///./{DB_PATH}")
+# We can reconstruct DATABASE_URL if individual Postgres parameters are provided
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = os.getenv("DB_NAME")
+
+if DB_USER and DB_PASSWORD and DB_HOST and DB_NAME:
+    DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+else:
+    DB_PATH = os.getenv("DB_PATH", "induction_system.db")
+    DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///./{DB_PATH}")
+
+# Fall back to SQLite if the database URL contains template placeholders
+if "username:password" in DATABASE_URL or "host:port" in DATABASE_URL or "database_name" in DATABASE_URL:
+    DB_PATH = os.getenv("DB_PATH", "induction_system.db")
+    DATABASE_URL = f"sqlite:///./{DB_PATH}"
 
 # Flag to check if we are connecting to a PostgreSQL database
 IS_POSTGRES = DATABASE_URL.startswith("postgres://") or DATABASE_URL.startswith("postgresql://")
