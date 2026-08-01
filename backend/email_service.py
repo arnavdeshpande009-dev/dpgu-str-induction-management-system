@@ -90,33 +90,40 @@ def send_email(
     qr_img = qr.make_image(fill_color='#1e1b4b', back_color='white').convert('RGB')
     qr_img = qr_img.resize((260, 260))
     
-    # Paste QR in center (on full template coordinates)
-    # Peach card center is X = 403. QR width = 260. Paste X = 273.
-    # Peach card middle Y is from Y = 317 to Y = 787. Paste Y = 317 + (470-260)//2 = 422.
-    card.paste(qr_img, (273, 422))
+    # Paste QR in horizontal center
+    qr_x = (cw - 260) // 2
+    card.paste(qr_img, (qr_x, 422))
     
-    # Draw Name and Department
+    # Draw Name, Department, and ID centered horizontally
     draw = ImageDraw.Draw(card)
     try:
         font = ImageFont.truetype('C:\\Windows\\Fonts\\arialbd.ttf', 24)
     except Exception:
         font = ImageFont.load_default()
         
-    draw.text((250, 785), student_name, font=font, fill='#1e1b4b')
-    draw.text((330, 840), student_department, font=font, fill='#1e1b4b')
-    
-    # Centered student ID text below the QR code (ends at Y=682, Name starts at Y=801)
-    id_text = f"ID: {student_id}"
-    try:
+    def get_centered_x(text, font, container_width):
         try:
-            text_w = draw.textlength(id_text, font=font)
-        except AttributeError:
-            bbox = draw.textbbox((0, 0), id_text, font=font)
-            text_w = bbox[2] - bbox[0]
-    except Exception:
-        text_w = len(id_text) * 12
-    text_x = 403 - text_w // 2
-    draw.text((text_x, 705), id_text, font=font, fill='#1e1b4b')
+            try:
+                text_w = draw.textlength(text, font=font)
+            except AttributeError:
+                bbox = draw.textbbox((0, 0), text, font=font)
+                text_w = bbox[2] - bbox[0]
+        except Exception:
+            text_w = len(text) * 12
+        return (container_width - text_w) // 2
+
+    # Draw centered ID at Y = 705
+    id_text = f"ID: {student_id}"
+    id_x = get_centered_x(id_text, font, cw)
+    draw.text((id_x, 705), id_text, font=font, fill='#1e1b4b')
+    
+    # Draw centered Name at Y = 785
+    name_x = get_centered_x(student_name, font, cw)
+    draw.text((name_x, 785), student_name, font=font, fill='#1e1b4b')
+    
+    # Draw centered Department at Y = 840
+    dept_x = get_centered_x(student_department, font, cw)
+    draw.text((dept_x, 840), student_department, font=font, fill='#1e1b4b')
     
     # Save a copy as the official QR Code file
     qr_file_path = os.path.join(config.QRCODES_DIR, f"{student_id}.png")
