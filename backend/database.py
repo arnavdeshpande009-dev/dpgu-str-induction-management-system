@@ -169,6 +169,7 @@ def init_db():
                 id SERIAL PRIMARY KEY,
                 department VARCHAR(255) UNIQUE,
                 mock_email BOOLEAN DEFAULT FALSE,
+                email_provider VARCHAR(50) DEFAULT 'smtp',
                 smtp_host VARCHAR(255) DEFAULT 'smtp.gmail.com',
                 smtp_port INTEGER DEFAULT 587,
                 smtp_user VARCHAR(255) DEFAULT '',
@@ -198,6 +199,11 @@ def init_db():
             conn.rollback()
         try:
             cursor.execute("ALTER TABLE settings DROP CONSTRAINT IF EXISTS settings_id_check")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+        try:
+            cursor.execute("ALTER TABLE settings ADD COLUMN email_provider VARCHAR(50) DEFAULT 'smtp'")
             conn.commit()
         except Exception:
             conn.rollback()
@@ -246,6 +252,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 department TEXT UNIQUE,
                 mock_email BOOLEAN DEFAULT 0,
+                email_provider TEXT DEFAULT 'smtp',
                 smtp_host TEXT DEFAULT 'smtp.gmail.com',
                 smtp_port INTEGER DEFAULT 587,
                 smtp_user TEXT DEFAULT '',
@@ -267,6 +274,10 @@ def init_db():
             pass
         try:
             cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_settings_dept ON settings(department)")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE settings ADD COLUMN email_provider TEXT DEFAULT 'smtp'")
         except Exception:
             pass
             
@@ -379,6 +390,7 @@ def update_settings(settings_dict, department=None):
         cursor.execute("""
             UPDATE settings
             SET mock_email = ?,
+                email_provider = ?,
                 smtp_host = ?,
                 smtp_port = ?,
                 smtp_user = ?,
@@ -393,6 +405,7 @@ def update_settings(settings_dict, department=None):
             WHERE id = ?
         """, (
             True if settings_dict.get("mock_email", True) else False,
+            settings_dict.get("email_provider", "smtp"),
             settings_dict.get("smtp_host", "smtp.gmail.com"),
             int(settings_dict.get("smtp_port", 587)),
             settings_dict.get("smtp_user", ""),
@@ -414,13 +427,14 @@ def update_settings(settings_dict, department=None):
             
         cursor.execute("""
             INSERT INTO settings (
-                id, department, mock_email, smtp_host, smtp_port, smtp_user, smtp_password,
+                id, department, mock_email, email_provider, smtp_host, smtp_port, smtp_user, smtp_password,
                 smtp_from, smtp_from_name, email_subject, email_body, event_date, event_time, event_venue
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             new_id,
             dept,
             True if settings_dict.get("mock_email", True) else False,
+            settings_dict.get("email_provider", "smtp"),
             settings_dict.get("smtp_host", "smtp.gmail.com"),
             int(settings_dict.get("smtp_port", 587)),
             settings_dict.get("smtp_user", ""),

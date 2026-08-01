@@ -19,21 +19,24 @@ def run_tests():
     cursor = conn.cursor()
     
     student_id = "DPGU-IND-1001-TEST"
+    ph = "%s" if database.config.IS_POSTGRES else "?"
+    
     cursor.execute(
-        """
+        f"""
         INSERT INTO students (student_id, name, email, department)
-        VALUES (?, ?, ?, ?)
+        VALUES ({ph}, {ph}, {ph}, {ph})
         """,
         (student_id, "Test Student", "test@dpgu.edu.in", "Computer Science")
     )
     conn.commit()
     
     # Verify insertion
-    row = cursor.execute("SELECT * FROM students WHERE student_id = ?", (student_id,)).fetchone()
+    cursor.execute(f"SELECT * FROM students WHERE student_id = {ph}", (student_id,))
+    row = cursor.fetchone()
     assert row is not None, "Failed to insert test student"
     assert row["name"] == "Test Student", "Name mismatch"
     assert row["email"] == "test@dpgu.edu.in", "Email mismatch"
-    assert row["checked_in"] == 0, "Default check-in status should be False"
+    assert bool(row["checked_in"]) is False, "Default check-in status should be False"
     print("Direct insert test passed.")
     
     # 4. Test QR Code and Mock Email Generation
@@ -47,7 +50,7 @@ def run_tests():
     
     # Verify that QR Code and Mock Email files exist
     qr_path = os.path.join("static/qrcodes", f"{student_id}.png")
-    email_path = os.path.join("static/sent_emails", f"test@dpgu.edu.in_{student_id}.html")
+    email_path = os.path.join("static/sent_emails", f"test@dpgu.edu.in_{student_id}.png")
     
     assert os.path.exists(qr_path), f"QR code file not found at {qr_path}"
     assert os.path.exists(email_path), f"Mock email file not found at {email_path}"
@@ -58,17 +61,18 @@ def run_tests():
     # 5. Verify Check-in logic
     print("Testing check-in logic...")
     cursor.execute(
-        """
+        f"""
         UPDATE students
-        SET checked_in = 1, check_in_time = '2026-07-29T12:00:00'
-        WHERE student_id = ?
+        SET checked_in = TRUE, check_in_time = '2026-07-29T12:00:00'
+        WHERE student_id = {ph}
         """,
         (student_id,)
     )
     conn.commit()
     
-    row = cursor.execute("SELECT * FROM students WHERE student_id = ?", (student_id,)).fetchone()
-    assert row["checked_in"] == 1, "Failed to mark check-in"
+    cursor.execute(f"SELECT * FROM students WHERE student_id = {ph}", (student_id,))
+    row = cursor.fetchone()
+    assert bool(row["checked_in"]) is True, "Failed to mark check-in"
     assert row["check_in_time"] == '2026-07-29T12:00:00', "Failed to record check-in time"
     print("Check-in test passed.")
     

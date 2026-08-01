@@ -33,6 +33,7 @@ class StatsResponse(BaseModel):
 
 class EmailConfigRequest(BaseModel):
     mock_email: bool
+    email_provider: Optional[str] = "smtp"
     smtp_host: str
     smtp_port: int
     smtp_user: str

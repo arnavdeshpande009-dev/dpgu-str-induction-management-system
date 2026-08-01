@@ -35,3 +35,9 @@ frontend/.env
 # Keep directories but ignore files
 !backend/static/sent_emails/.gitkeep
 !backend/static/qrcodes/.gitkeep
+
+# OAuth secrets and tokens
+client_secret_*.json
+backend/client_secret_*.json
+token.json
+backend/token.json

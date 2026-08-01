@@ -272,6 +272,7 @@ def get_settings(dept: Optional[str] = Query(None)):
         raise HTTPException(status_code=404, detail="Settings not found.")
     return models.EmailConfigRequest(
         mock_email=bool(settings["mock_email"]),
+        email_provider=settings.get("email_provider") or "smtp",
         smtp_host=settings["smtp_host"] or "",
         smtp_port=settings["smtp_port"] or 587,
         smtp_user=settings["smtp_user"] or "",
@@ -732,12 +733,20 @@ def test_smtp_connection(settings: models.EmailConfigRequest):
         body = "<h3>SMTP Test Successful!</h3><p>Your DPGU STR Induction email setup is fully operational.</p>"
         msg.attach(MIMEText(body, "html"))
         
-        server = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=120)
-        server.starttls()
-        server.login(settings.smtp_user, settings.smtp_password)
-        server.sendmail(settings.smtp_from, settings.smtp_user, msg.as_string())
-        server.quit()
-        return {"success": True, "message": f"Test email sent successfully to {settings.smtp_user}."}
+        if settings.email_provider == "gmail_oauth":
+            import gmail_oauth
+            import base64
+            service = gmail_oauth.get_gmail_service()
+            raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+            service.users().messages().send(userId="me", body={"raw": raw_message}).execute()
+            return {"success": True, "message": f"Test email sent successfully via Google OAuth2 to {settings.smtp_user}."}
+        else:
+            server = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=120)
+            server.starttls()
+            server.login(settings.smtp_user, settings.smtp_password)
+            server.sendmail(settings.smtp_from, settings.smtp_user, msg.as_string())
+            server.quit()
+            return {"success": True, "message": f"Test email sent successfully via SMTP to {settings.smtp_user}."}
     except Exception as e:
         return {"success": False, "message": str(e)}
 

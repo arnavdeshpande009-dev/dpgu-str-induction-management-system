@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 export default function SettingsView({ stats, fetchStats, showToast, apiBase, currentUser }) {
   const [mockEmail, setMockEmail] = useState(false);
+  const [emailProvider, setEmailProvider] = useState("smtp");
   const [smtpHost, setSmtpHost] = useState("smtp.gmail.com");
   const [smtpPort, setSmtpPort] = useState(587);
   const [smtpUser, setSmtpUser] = useState("");
@@ -26,6 +27,7 @@ export default function SettingsView({ stats, fetchStats, showToast, apiBase, cu
       if (res.ok) {
         const data = await res.json();
         setMockEmail(data.mock_email);
+        setEmailProvider(data.email_provider || "smtp");
         setSmtpHost(data.smtp_host);
         setSmtpPort(data.smtp_port);
         setSmtpUser(data.smtp_user);
@@ -43,6 +45,7 @@ export default function SettingsView({ stats, fetchStats, showToast, apiBase, cu
     setSavingSettings(true);
     const settingsPayload = {
       mock_email: mockEmail,
+      email_provider: emailProvider,
       smtp_host: smtpHost,
       smtp_port: parseInt(smtpPort),
       smtp_user: smtpUser,
@@ -76,6 +79,7 @@ export default function SettingsView({ stats, fetchStats, showToast, apiBase, cu
     
     const settingsPayload = {
       mock_email: mockEmail,
+      email_provider: emailProvider,
       smtp_host: smtpHost,
       smtp_port: parseInt(smtpPort),
       smtp_user: smtpUser,
@@ -94,7 +98,7 @@ export default function SettingsView({ stats, fetchStats, showToast, apiBase, cu
       if (res.ok && data.success) {
         showToast("Success", data.message, "success");
       } else {
-        showToast("SMTP Connection Failed", data.message || "Failed to reach SMTP server.", "error");
+        showToast("Email Connection Failed", data.message || "Failed to reach server.", "error");
       }
     } catch (err) {
       showToast("Error", "Server communication failed.", "error");
@@ -136,52 +140,91 @@ export default function SettingsView({ stats, fetchStats, showToast, apiBase, cu
         </div>
 
         <form onSubmit={handleTestSmtp}>
-          <div className="settings-row-grid">
-            <div className="settings-form-group">
-              <label className="settings-label">SMTP Server Host</label>
-              <input 
-                type="text" 
-                className="settings-input" 
-                value={smtpHost}
-                onChange={(e) => setSmtpHost(e.target.value)}
-                required
-              />
-            </div>
-            <div className="settings-form-group">
-              <label className="settings-label">Port</label>
-              <input 
-                type="number" 
-                className="settings-input" 
-                value={smtpPort}
-                onChange={(e) => setSmtpPort(parseInt(e.target.value))}
-                required
-              />
-            </div>
+          <div className="settings-form-group" style={{ marginBottom: '20px' }}>
+            <label className="settings-label">Email Dispatch Method</label>
+            <select 
+              className="settings-input"
+              value={emailProvider}
+              onChange={(e) => setEmailProvider(e.target.value)}
+              style={{ background: 'rgba(30, 27, 75, 0.5)', color: '#fff', cursor: 'pointer' }}
+            >
+              <option value="smtp">Standard SMTP (Username/Password)</option>
+              <option value="gmail_oauth">Google OAuth2 (Gmail API)</option>
+            </select>
           </div>
+
+          {emailProvider === 'gmail_oauth' && (
+            <div style={{ 
+              background: 'rgba(79, 70, 229, 0.1)', 
+              border: '1px solid rgba(79, 70, 229, 0.25)', 
+              borderRadius: '12px', 
+              padding: '15px', 
+              marginBottom: '20px', 
+              fontSize: '14.5px', 
+              lineHeight: '1.5',
+              color: 'rgba(255, 255, 255, 0.85)' 
+            }}>
+              <strong style={{ color: '#a5b4fc', display: 'block', marginBottom: '5px' }}>Google OAuth2 Setup:</strong>
+              <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                <li>Make sure your <code>client_secret_*.json</code> file is placed in your backend folder.</li>
+                <li>Clicking <strong>Test Connection</strong> will open a browser window locally to authorize your account (e.g. <code>info.str@dypdpu.edu.in</code>).</li>
+                <li>After authorization, a <code>token.json</code> file is generated locally, allowing automated sends without future prompts.</li>
+              </ul>
+            </div>
+          )}
+
+          {emailProvider === 'smtp' && (
+            <div className="settings-row-grid">
+              <div className="settings-form-group">
+                <label className="settings-label">SMTP Server Host</label>
+                <input 
+                  type="text" 
+                  className="settings-input" 
+                  value={smtpHost}
+                  onChange={(e) => setSmtpHost(e.target.value)}
+                  required={emailProvider === 'smtp'}
+                />
+              </div>
+              <div className="settings-form-group">
+                <label className="settings-label">Port</label>
+                <input 
+                  type="number" 
+                  className="settings-input" 
+                  value={smtpPort}
+                  onChange={(e) => setSmtpPort(parseInt(e.target.value))}
+                  required={emailProvider === 'smtp'}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="settings-row-grid">
             <div className="settings-form-group">
-              <label className="settings-label">Username / Username Email</label>
+              <label className="settings-label">
+                {emailProvider === 'gmail_oauth' ? "Authorized Account Email" : "Username / Username Email"}
+              </label>
               <input 
                 type="text" 
                 className="settings-input" 
                 value={smtpUser}
                 onChange={(e) => setSmtpUser(e.target.value)}
-                placeholder="e.g. admin@gmail.com"
+                placeholder="e.g. info.str@dypdpu.edu.in"
                 required
               />
             </div>
-            <div className="settings-form-group">
-              <label className="settings-label">Password / App Password</label>
-              <input 
-                type="password" 
-                className="settings-input" 
-                value={smtpPassword}
-                onChange={(e) => setSmtpPassword(e.target.value)}
-                placeholder="SMTP account password"
-                required
-              />
-            </div>
+            {emailProvider === 'smtp' && (
+              <div className="settings-form-group">
+                <label className="settings-label">Password / App Password</label>
+                <input 
+                  type="password" 
+                  className="settings-input" 
+                  value={smtpPassword}
+                  onChange={(e) => setSmtpPassword(e.target.value)}
+                  placeholder="SMTP account password"
+                  required={emailProvider === 'smtp'}
+                />
+              </div>
+            )}
           </div>
 
           <div className="settings-row-grid">
@@ -213,7 +256,9 @@ export default function SettingsView({ stats, fetchStats, showToast, apiBase, cu
               className="btn btn-primary"
               disabled={testingSmtp}
             >
-              {testingSmtp ? "Connecting & Sending..." : "Test SMTP Connection"}
+              {testingSmtp 
+                ? "Connecting & Sending..." 
+                : (emailProvider === 'gmail_oauth' ? "Test OAuth Connection" : "Test SMTP Connection")}
             </button>
           </div>
         </form>

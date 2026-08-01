@@ -254,12 +254,22 @@ def send_email(
                         print(f"Failed to attach file {filename}: {e}")
             
         # Connect and send
-        server = smtplib.SMTP(host, port, timeout=120)
-        server.starttls()
-        server.login(user, pwd)
-        server.sendmail(sender, student_email, msg.as_string())
-        server.quit()
-        return True
+        provider = smtp_settings.get("email_provider", "smtp") if smtp_settings else "smtp"
+        
+        if provider == "gmail_oauth":
+            import gmail_oauth
+            import base64
+            service = gmail_oauth.get_gmail_service()
+            raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+            service.users().messages().send(userId="me", body={"raw": raw_message}).execute()
+            return True
+        else:
+            server = smtplib.SMTP(host, port, timeout=120)
+            server.starttls()
+            server.login(user, pwd)
+            server.sendmail(sender, student_email, msg.as_string())
+            server.quit()
+            return True
     except Exception as e:
         print(f"SMTP Error for {student_email}: {e}")
         # On SMTP fail, save a FAILED marker file
