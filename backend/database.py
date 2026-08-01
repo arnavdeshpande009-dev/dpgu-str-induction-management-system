@@ -148,7 +148,7 @@ def init_db():
     cursor = conn.cursor()
     
     if config.IS_POSTGRES:
-        # Create Postgres tables
+        # Create Postgres tables — commit each immediately so ALTER TABLE rollbacks can't undo them
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS students (
                 id SERIAL PRIMARY KEY,
@@ -162,6 +162,7 @@ def init_db():
                 email_sent_time VARCHAR(100)
             )
         """)
+        conn.commit()
         
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS settings (
@@ -181,8 +182,10 @@ def init_db():
                 event_venue VARCHAR(255) DEFAULT '4th floor, DPU Auditorium'
             )
         """)
+        conn.commit()
         
         # Alter table queries for backward compatibility / department migration
+        # These may fail if columns already exist — each is isolated with its own commit/rollback
         try:
             cursor.execute("ALTER TABLE settings ADD COLUMN department VARCHAR(255)")
             conn.commit()
@@ -210,6 +213,7 @@ def init_db():
                 department VARCHAR(255)
             )
         """)
+        conn.commit()
         
         try:
             cursor.execute("ALTER TABLE users ADD COLUMN department VARCHAR(255)")
@@ -219,6 +223,7 @@ def init_db():
         
         # Seed default settings
         cursor.execute("INSERT INTO settings (id, department, mock_email) VALUES (1, 'Global', FALSE) ON CONFLICT (id) DO NOTHING")
+        conn.commit()
         
     else:
         # Create SQLite tables
