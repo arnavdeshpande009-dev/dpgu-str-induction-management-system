@@ -234,7 +234,7 @@ def send_email(
                         print(f"Failed to attach file {filename}: {e}")
             
         # Connect and send
-        server = smtplib.SMTP(host, port)
+        server = smtplib.SMTP(host, port, timeout=10)
         server.starttls()
         server.login(user, pwd)
         server.sendmail(sender, student_email, msg.as_string())

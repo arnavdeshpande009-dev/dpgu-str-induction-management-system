@@ -732,7 +732,7 @@ def test_smtp_connection(settings: models.EmailConfigRequest):
         body = "<h3>SMTP Test Successful!</h3><p>Your DPGU STR Induction email setup is fully operational.</p>"
         msg.attach(MIMEText(body, "html"))
         
-        server = smtplib.SMTP(settings.smtp_host, settings.smtp_port)
+        server = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10)
         server.starttls()
         server.login(settings.smtp_user, settings.smtp_password)
         server.sendmail(settings.smtp_from, settings.smtp_user, msg.as_string())
