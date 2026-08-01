@@ -577,10 +577,11 @@ def reset_system(dept: Optional[str] = Query(None)):
     """Clear all records and delete generated static files, optionally filtered by department."""
     conn = database.get_db_connection()
     cursor = conn.cursor()
+    ph = "%s" if config.IS_POSTGRES else "?"
     
     if dept:
         # Fetch all students in this department to get their student_ids and emails
-        students = cursor.execute("SELECT student_id, email FROM students WHERE LOWER(department) = LOWER(?)", (dept,)).fetchall()
+        students = cursor.execute(f"SELECT student_id, email FROM students WHERE LOWER(department) = LOWER({ph})", (dept,)).fetchall()
         for s in students:
             # Delete QR codes
             qr_file = os.path.join(config.QRCODES_DIR, f"{s['student_id']}.png")
@@ -605,9 +606,9 @@ def reset_system(dept: Optional[str] = Query(None)):
                     pass
                     
         # Delete from students table
-        cursor.execute("DELETE FROM students WHERE LOWER(department) = LOWER(?)", (dept,))
+        cursor.execute(f"DELETE FROM students WHERE LOWER(department) = LOWER({ph})", (dept,))
         # Delete department-specific settings row
-        cursor.execute("DELETE FROM settings WHERE LOWER(department) = LOWER(?)", (dept,))
+        cursor.execute(f"DELETE FROM settings WHERE LOWER(department) = LOWER({ph})", (dept,))
         conn.commit()
         conn.close()
         return {"message": f"Wiped all records and passes for department '{dept}'."}

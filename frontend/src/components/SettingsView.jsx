@@ -230,7 +230,8 @@ export default function SettingsView({ stats, fetchStats, showToast, apiBase, cu
         </div>
       </div>
 
-      {/* Database control */}
+      {/* Database control — visible to Induction Admin only */}
+      {currentUser?.username === 'admin' && (
       <div className="panel" style={{ border: '1px solid rgba(239, 68, 68, 0.15)' }}>
         <div className="panel-header" style={{ borderBottom: '1px solid rgba(239, 68, 68, 0.1)' }}>
           <h2 className="panel-title" style={{ color: '#fca5a5' }}>
@@ -268,6 +269,7 @@ export default function SettingsView({ stats, fetchStats, showToast, apiBase, cu
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }
