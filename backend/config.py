@@ -28,7 +28,11 @@ ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
+    "https://dpgu-str-induction-management-system-1.onrender.com",
 ]
+env_origins = os.getenv("ALLOWED_ORIGINS")
+if env_origins:
+    ALLOWED_ORIGINS.extend([origin.strip() for origin in env_origins.split(",") if origin.strip()])
 
 # Email Settings
 MOCK_EMAIL = os.getenv("MOCK_EMAIL", "True").lower() in ("true", "1", "yes")
