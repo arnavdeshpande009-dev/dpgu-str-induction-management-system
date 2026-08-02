@@ -60,6 +60,8 @@ def send_email(
     search_paths = [
         "ticket.jpeg",
         "backend/ticket.jpeg",
+        "../ticket.jpeg",
+        "../backend/ticket.jpeg",
         os.path.join("static", "card_template.png"),
         os.path.join("backend", "static", "card_template.png")
     ]
@@ -88,13 +90,13 @@ def send_email(
     qr.add_data(student_id)
     qr.make(fit=True)
     qr_img = qr.make_image(fill_color='#1e1b4b', back_color='white').convert('RGB')
-    qr_img = qr_img.resize((260, 260))
+    qr_img = qr_img.resize((240, 240))
     
-    # Paste QR in horizontal center
-    qr_x = (cw - 260) // 2
-    card.paste(qr_img, (qr_x, 422))
+    # Paste QR in horizontal center, below Prarambh logo
+    qr_x = (cw - 240) // 2
+    card.paste(qr_img, (qr_x, 360))
     
-    # Draw Name, Department, and ID centered horizontally
+    # Draw Name, Department, and ID
     draw = ImageDraw.Draw(card)
     try:
         font = ImageFont.truetype('C:\\Windows\\Fonts\\arialbd.ttf', 24)
@@ -112,18 +114,16 @@ def send_email(
             text_w = len(text) * 12
         return (container_width - text_w) // 2
 
-    # Draw centered ID at Y = 705
+    # Draw centered ID right below the QR code (Y=612)
     id_text = f"ID: {student_id}"
     id_x = get_centered_x(id_text, font, cw)
-    draw.text((id_x, 705), id_text, font=font, fill='#1e1b4b')
+    draw.text((id_x, 612), id_text, font=font, fill='#1e1b4b')
     
-    # Draw centered Name at Y = 785
-    name_x = get_centered_x(student_name, font, cw)
-    draw.text((name_x, 785), student_name, font=font, fill='#1e1b4b')
+    # Draw student name next to "Name-"
+    draw.text((220, 666), student_name, font=font, fill='#1e1b4b')
     
-    # Draw centered Department at Y = 840
-    dept_x = get_centered_x(student_department, font, cw)
-    draw.text((dept_x, 840), student_department, font=font, fill='#1e1b4b')
+    # Draw student department next to "Department-"
+    draw.text((325, 718), student_department, font=font, fill='#1e1b4b')
     
     # Save a copy as the official QR Code file
     qr_file_path = os.path.join(config.QRCODES_DIR, f"{student_id}.png")
